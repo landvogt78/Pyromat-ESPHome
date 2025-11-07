@@ -1,0 +1,5 @@
+# Ignoriere die ESPHome Geheimnisse
+secrets.yaml
+
+# Ignoriere auch die Build-Ordner von ESPHome
+.esphome/

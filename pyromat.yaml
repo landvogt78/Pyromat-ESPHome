@@ -1,0 +1,395 @@
+esphome:
+  name: pyromat
+  friendly_name: "Pyromat Eco"
+
+esp32:
+  board: esp32dev
+  framework:
+        type: esp-idf
+
+ota:
+  platform: esphome
+
+wifi:
+  ssid: !secret my_wifi_ssid
+  password: !secret my_wifi_password
+  fast_connect: true
+  reboot_timeout: 5min
+
+api:
+  reboot_timeout: 0s
+
+web_server:
+  port: 80
+
+mqtt:
+  broker: !secret mqtt_broker
+  port: !secret mqtt_port
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  discovery: true
+  topic_prefix: !secret mqtt_topic_prefix
+
+spi:
+  clk_pin: 18
+  mosi_pin: 23
+  miso_pin: 19
+
+logger:
+  level: ERROR
+
+canbus:
+  - platform: mcp2515
+    id: mcp2515_can
+    cs_pin: 5
+    bit_rate: 125kbps
+    clock: 8MHz
+    can_id: 1
+    on_frame:
+    - can_id: 0x23b
+      then:
+      - lambda: |-
+          if (x.size() == 8) {
+            uint16_t param_id = ((uint16_t)x[1] << 8) | x[0];
+            switch (param_id) {
+                case 0x7b: {
+                    uint16_t val = ((uint16_t)x[7] << 8) | x[6];
+                      id(ventil_ruecklaufmischer).publish_state(val);
+                      break;
+                    }
+                    case 0x7e: {
+                      uint16_t val = ((uint16_t)x[5] << 8) | x[4];
+                      id(ventil_puffer).publish_state(val);
+                      break;
+                    }
+                    case 0x9c: {
+                      float temp = (((uint16_t)x[7] << 8) | x[6]) * 0.1;
+                      id(kesseltemperatur).publish_state(temp);
+                      break;
+                    }
+                    case 0x9f: {
+                      float temp = (((uint16_t)x[3] << 8) | x[2]) * 0.1;
+                      id(soll_kesseltemperatur).publish_state(temp);
+                      break;
+                    }
+                    case 0x001E: {
+                      float o2 = (((uint16_t)x[7] << 8) | x[6]) * 0.1;
+                      id(restsauerstoff).publish_state(o2);
+                      break;
+                    }
+                    case 0x0054: {
+                      float temp = (((uint16_t)x[3] << 8) | x[2]) * 0.1;
+                      id(systemtemperatur).publish_state(temp);
+                      break;
+                    }
+                    case 0x0066: {
+                      float abgasTemp = (((uint16_t)x[3] << 8) | x[2]) * 0.1;
+                      uint16_t luefterRPM = ((uint16_t)x[7] << 8) | x[6];
+                      id(abgastemperatur).publish_state(abgasTemp);
+                      id(luefterdrehzahl).publish_state(luefterRPM);
+                      break;
+                    }
+                    case 0x0087: {
+                      uint16_t primKlappe = ((uint16_t)x[5] << 8) | x[4];
+                      id(primaerluftklappe).publish_state(primKlappe);
+                      break;
+                    }
+                    case 0x008D: {
+                      float kesselRuecklauf = (((uint16_t)x[7] << 8) | x[6]) * 0.1;
+                      id(kesselruecklauf).publish_state(kesselRuecklauf);
+                      break;
+                    }
+                    case 0x0096: {
+                      float pufferMitte = (((uint16_t)x[3] << 8) | x[2]) * 0.1;
+                      float pufferOben = (((uint16_t)x[5] << 8) | x[4]) * 0.1;
+                      id(puffer_mitte).publish_state(pufferMitte);
+                      id(puffer_oben).publish_state(pufferOben);
+                      break;
+                    }
+                    case 0x0117: {
+                      float heizungVorlauf = (((uint16_t)x[7] << 8) | x[6]) * 0.1;
+                      id(heizungsvorlauf).publish_state(heizungVorlauf);
+                      break;
+                    }
+                    case 0x0027: {
+                      float pufferUnten = (((uint16_t)x[3] << 8) | x[2]) * 0.1;
+                      id(puffer_unten).publish_state(pufferUnten);
+                      break;
+                    }
+                    case 0x0090: {
+                      float sekKlappe = (((uint16_t)x[7] << 8) | x[6]);
+                      id(sekundaerluftklappe).publish_state(sekKlappe);
+                      break;
+                    }
+                } // end switch
+            } // end if
+    - can_id: 0x53b
+      then:
+      - lambda: |-
+          if (x.size() == 8) {
+            uint16_t param_id = ((uint16_t)x[1] << 8) | x[0];
+            switch (param_id) {
+                case 0x7b: {
+                    uint16_t val = ((uint16_t)x[7] << 8) | x[6];
+                      id(ventil_ruecklaufmischer).publish_state(val);
+                      break;
+                    }
+                    case 0x7e: {
+                      uint16_t val = ((uint16_t)x[5] << 8) | x[4];
+                      id(ventil_puffer).publish_state(val);
+                      break;
+                    }
+                    case 0x9c: {
+                      float temp = (((uint16_t)x[7] << 8) | x[6]) * 0.1;
+                      id(kesseltemperatur).publish_state(temp);
+                      break;
+                    }
+                    case 0x9f: {
+                      float temp = (((uint16_t)x[3] << 8) | x[2]) * 0.1;
+                      id(soll_kesseltemperatur).publish_state(temp);
+                      break;
+                    }
+                    case 0x001E: {
+                      float o2 = (((uint16_t)x[7] << 8) | x[6]) * 0.1;
+                      id(restsauerstoff).publish_state(o2);
+                      break;
+                    }
+                    case 0x0054: {
+                      float temp = (((uint16_t)x[3] << 8) | x[2]) * 0.1;
+                      id(systemtemperatur).publish_state(temp);
+                      break;
+                    }
+                    case 0x0066: {
+                      float abgasTemp = (((uint16_t)x[3] << 8) | x[2]) * 0.1;
+                      uint16_t luefterRPM = ((uint16_t)x[7] << 8) | x[6];
+                      id(abgastemperatur).publish_state(abgasTemp);
+                      id(luefterdrehzahl).publish_state(luefterRPM);
+                      break;
+                    }
+                    case 0x0087: {
+                      uint16_t primKlappe = ((uint16_t)x[5] << 8) | x[4];
+                      id(primaerluftklappe).publish_state(primKlappe);
+                      break;
+                    }
+                    case 0x008D: {
+                      float kesselRuecklauf = (((uint16_t)x[7] << 8) | x[6]) * 0.1;
+                      id(kesselruecklauf).publish_state(kesselRuecklauf);
+                      break;
+                    }
+                    case 0x0096: {
+                      float pufferMitte = (((uint16_t)x[3] << 8) | x[2]) * 0.1;
+                      float pufferOben = (((uint16_t)x[5] << 8) | x[4]) * 0.1;
+                      id(puffer_mitte).publish_state(pufferMitte);
+                      id(puffer_oben).publish_state(pufferOben);
+                      break;
+                    }
+                    case 0x0117: {
+                      float heizungVorlauf = (((uint16_t)x[7] << 8) | x[6]) * 0.1;
+                      id(heizungsvorlauf).publish_state(heizungVorlauf);
+                      break;
+                    }
+                    case 0x0027: {
+                      float pufferUnten = (((uint16_t)x[3] << 8) | x[2]) * 0.1;
+                      id(puffer_unten).publish_state(pufferUnten);
+                      break;
+                    }
+                    case 0x0090: {
+                      float sekKlappe = (((uint16_t)x[7] << 8) | x[6]);
+                      id(sekundaerluftklappe).publish_state(sekKlappe);
+                      break;
+                    }
+                } // end switch
+            } // end if
+    - can_id: 0x33b
+      then:
+      - lambda: |-
+          if (x.size() == 8) {
+            uint16_t param_id = ((uint16_t)x[1] << 8) | x[0];
+            switch (param_id) {
+                case 0x7b: {
+                    uint16_t val = ((uint16_t)x[7] << 8) | x[6];
+                      id(ventil_ruecklaufmischer).publish_state(val);
+                      break;
+                    }
+                    case 0x7e: {
+                      uint16_t val = ((uint16_t)x[5] << 8) | x[4];
+                      id(ventil_puffer).publish_state(val);
+                      break;
+                    }
+                    case 0x9c: {
+                      float temp = (((uint16_t)x[7] << 8) | x[6]) * 0.1;
+                      id(kesseltemperatur).publish_state(temp);
+                      break;
+                    }
+                    case 0x9f: {
+                      float temp = (((uint16_t)x[3] << 8) | x[2]) * 0.1;
+                      id(soll_kesseltemperatur).publish_state(temp);
+                      break;
+                    }
+                    case 0x001E: {
+                      float o2 = (((uint16_t)x[7] << 8) | x[6]) * 0.1;
+                      id(restsauerstoff).publish_state(o2);
+                      break;
+                    }
+                    case 0x0054: {
+                      float temp = (((uint16_t)x[3] << 8) | x[2]) * 0.1;
+                      id(systemtemperatur).publish_state(temp);
+                      break;
+                    }
+                    case 0x0066: {
+                      float abgasTemp = (((uint16_t)x[3] << 8) | x[2]) * 0.1;
+                      uint16_t luefterRPM = ((uint16_t)x[7] << 8) | x[6];
+                      id(abgastemperatur).publish_state(abgasTemp);
+                      id(luefterdrehzahl).publish_state(luefterRPM);
+                      break;
+                    }
+                    case 0x0087: {
+                      uint16_t primKlappe = ((uint16_t)x[5] << 8) | x[4];
+                      id(primaerluftklappe).publish_state(primKlappe);
+                      break;
+                    }
+                    case 0x008D: {
+                      float kesselRuecklauf = (((uint16_t)x[7] << 8) | x[6]) * 0.1;
+                      id(kesselruecklauf).publish_state(kesselRuecklauf);
+                      break;
+                    }
+                    case 0x0096: {
+                      float pufferMitte = (((uint16_t)x[3] << 8) | x[2]) * 0.1;
+                      float pufferOben = (((uint16_t)x[5] << 8) | x[4]) * 0.1;
+                      id(puffer_mitte).publish_state(pufferMitte);
+                      id(puffer_oben).publish_state(pufferOben);
+                      break;
+                    }
+                    case 0x0117: {
+                      float heizungVorlauf = (((uint16_t)x[7] << 8) | x[6]) * 0.1;
+                      id(heizungsvorlauf).publish_state(heizungVorlauf);
+                      break;
+                    }
+                    case 0x0027: {
+                      float pufferUnten = (((uint16_t)x[3] << 8) | x[2]) * 0.1;
+                      id(puffer_unten).publish_state(pufferUnten);
+                      break;
+                    }
+                    case 0x0090: {
+                      float sekKlappe = (((uint16_t)x[7] << 8) | x[6]);
+                      id(sekundaerluftklappe).publish_state(sekKlappe);
+                      break;
+                    }
+                } // end switch
+            } // end if
+sensor:
+  - platform: template
+    id: ventil_ruecklaufmischer
+    name: "13 Ventil Ruecklaufmischer"
+    filters:
+      - delta: 0.1
+
+  - platform: template
+    id: ventil_puffer
+    name: "14 Ventil Puffer"
+    filters:
+      - delta: 0.1
+
+  - platform: template
+    id: systemtemperatur
+    name: "08 Systemtemperatur"
+    unit_of_measurement: "C"
+    accuracy_decimals: 1
+    filters:
+      - delta: 0.1
+
+  - platform: template
+    id: soll_kesseltemperatur
+    name: "07 Soll Kesseltemperatur"
+    unit_of_measurement: "C"
+    accuracy_decimals: 1
+    filters:
+      - delta: 0.1
+
+  - platform: template
+    id: restsauerstoff
+    name: "05 Restsauerstoff"
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+    filters:
+      - delta: 0.1
+
+  - platform: template
+    id: kesseltemperatur
+    name: "06 Kesseltemperatur"
+    unit_of_measurement: "C"
+    accuracy_decimals: 1
+    filters:
+      - delta: 0.1
+
+  - platform: template
+    id: abgastemperatur
+    name: "04 Abgastemperatur"
+    unit_of_measurement: "C"
+    accuracy_decimals: 1
+    filters:
+      - delta: 0.1
+
+  - platform: template
+    id: luefterdrehzahl
+    name: "09 Luefterdrehzahl"
+    unit_of_measurement: "U/min"
+    accuracy_decimals: 0
+    filters:
+      - delta: 0.1
+
+  - platform: template
+    id: primaerluftklappe
+    name: "10 Primaerluftklappe"
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+    filters:
+      - delta: 0.1
+
+  - platform: template
+    id: sekundaerluftklappe
+    name: "11 Sekundaerluftklappe"
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+    filters:
+      - delta: 0.1
+
+  - platform: template
+    id: kesselruecklauf
+    name: "12 Kesselruecklauf"
+    unit_of_measurement: "C"
+    accuracy_decimals: 1
+    filters:
+      - delta: 0.1
+
+  - platform: template
+    id: puffer_mitte
+    name: "02 Puffer Mitte"
+    unit_of_measurement: "C"
+    accuracy_decimals: 1
+    filters:
+      - delta: 0.1
+
+  - platform: template
+    id: puffer_oben
+    name: "01 Puffer Oben"
+    unit_of_measurement: "C"
+    accuracy_decimals: 1
+    filters:
+      - delta: 0.1
+
+  - platform: template
+    id: heizungsvorlauf
+    name: "15 Heizungsvorlauf"
+    unit_of_measurement: "C"
+    accuracy_decimals: 1
+    filters:
+      - delta: 0.1
+
+  - platform: template
+    id: puffer_unten
+    name: "03 Puffer Unten"
+    unit_of_measurement: "C"
+    accuracy_decimals: 1
+    filters:
+      - delta: 0.1
