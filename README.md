@@ -5,6 +5,7 @@ Dieser YAML liefert verschiedene Werte/Entitäten, die für eine Nutzung zur Vis
 Der ESP32 sowie das Modul können mittels StepDown-Converter direkt mit den internen 24V DC des Holzvergasers versorgt werden, so dass diese z.B. unsichtbar neben der Hauptlatine im Holzvergasers eingebaut werden können.
 
 Hier auch noch die Verkabelung des MCP2515-Moduls mit dem ESP32
+
 ESP32 5V → Modul VCC
 ESP32 GND → Modul GND
 ESP32 GPIO 23 (MOSI) → Modul SI (Slave In)
