@@ -1,0 +1,3 @@
+# Alternative ohne MQTT-Broker: Weboberflaeche + native ESPHome API.
+packages:
+  bridge: !include packages/bridge.yaml

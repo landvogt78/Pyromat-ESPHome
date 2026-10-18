@@ -1,0 +1,169 @@
+substitutions:
+  device_name: pyromat
+  friendly_name: Pyromat Eco
+  mcp2515_cs_pin: "5"
+  spi_clk_pin: "18"
+  spi_mosi_pin: "23"
+  spi_miso_pin: "19"
+  mcp2515_clock: 8MHz
+  can_mode: NORMAL
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  min_version: 2026.9.1
+  project:
+    name: landvogt78.pyromat-esphome
+    version: 2.0.0
+  includes:
+    # Make the custom global type visible before ESPHome declares its globals.
+    - <pyromat_decoder.h>
+    - include/pyromat_decoder.h
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+  level: WARN
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+  reboot_timeout: 0s
+
+ota:
+  - platform: esphome
+    encryption:
+      key: !secret api_encryption_key
+
+wifi:
+  ssid: !secret my_wifi_ssid
+  password: !secret my_wifi_password
+  reboot_timeout: 0s
+  ap:
+    ssid: Pyromat Einrichtung
+    password: !secret fallback_ap_password
+
+captive_portal:
+
+web_server:
+  port: 80
+  version: 3
+  # Eigene, im Flash eingebettete Oberflaeche. local:true wuerde die
+  # ESPHome-Standardseite laden und unsere eigene Seite ersetzen.
+  local: false
+  css_url: ""
+  js_url: ""
+  css_include: web/dashboard.css
+  js_include: web/dashboard.js
+  log: false
+  ota: false
+  auth:
+    username: !secret web_server_username
+    password: !secret web_server_password
+    type: digest
+
+spi:
+  clk_pin: ${spi_clk_pin}
+  mosi_pin: ${spi_mosi_pin}
+  miso_pin: ${spi_miso_pin}
+
+packages:
+  entities: !include entities.yaml
+
+globals:
+  - id: last_can_ms
+    type: uint32_t
+    initial_value: '0'
+  - id: can_seen
+    type: bool
+    initial_value: 'false'
+  - id: can_frames
+    type: uint32_t
+    initial_value: '0'
+  - id: boiler_clock
+    type: pyromat::Clock
+    initial_value: 'pyromat::Clock{}'
+
+canbus:
+  - platform: mcp2515
+    id: mcp2515_can
+    cs_pin: ${mcp2515_cs_pin}
+    bit_rate: 125kbps
+    clock: ${mcp2515_clock}
+    mode: ${can_mode}
+    can_id: 1
+    on_frame:
+      - can_id: 0x23B
+        then:
+          - script.execute:
+              id: decode_frame
+              frame_id: 0x23B
+              payload: !lambda return x;
+      - can_id: 0x33B
+        then:
+          - script.execute:
+              id: decode_frame
+              frame_id: 0x33B
+              payload: !lambda return x;
+      - can_id: 0x43B
+        then:
+          - script.execute:
+              id: decode_frame
+              frame_id: 0x43B
+              payload: !lambda return x;
+      - can_id: 0x53B
+        then:
+          - script.execute:
+              id: decode_frame
+              frame_id: 0x53B
+              payload: !lambda return x;
+
+script:
+  - id: decode_frame
+    mode: parallel
+    max_runs: 4
+    parameters:
+      frame_id: int
+      payload: uint8_t[]
+    then:
+      - lambda: |-
+          const auto decoded = pyromat::decode(frame_id, payload.data(), payload.size());
+          if (!decoded.valid_frame) return;
+          id(can_seen) = true;
+          id(last_can_ms) = millis();
+          id(can_frames)++;
+          for (size_t i = 0; i < decoded.size; i++) {
+            const auto &item = decoded.values[i];
+            switch (item.field) {
+              case pyromat::Field::BOILER: id(kesseltemperatur).publish_state(item.value); break;
+              case pyromat::Field::BOILER_TARGET: id(soll_kesseltemperatur).publish_state(item.value); break;
+              case pyromat::Field::EXHAUST: id(abgastemperatur).publish_state(item.value); break;
+              case pyromat::Field::RETURN_TEMP: id(kesselruecklauf).publish_state(item.value); break;
+              case pyromat::Field::SYSTEM: id(systemtemperatur).publish_state(item.value); break;
+              case pyromat::Field::BUFFER_TOP: id(puffer_oben).publish_state(item.value); break;
+              case pyromat::Field::BUFFER_MIDDLE: id(puffer_mitte).publish_state(item.value); break;
+              case pyromat::Field::BUFFER_BOTTOM: id(puffer_unten).publish_state(item.value); break;
+              case pyromat::Field::HEATING_SUPPLY: id(heizungsvorlauf).publish_state(item.value); break;
+              case pyromat::Field::O2: id(restsauerstoff).publish_state(item.value); break;
+              case pyromat::Field::O2_TARGET_CANDIDATE: id(soll_restsauerstoff).publish_state(item.value); break;
+              case pyromat::Field::FAN: id(luefterdrehzahl).publish_state(item.value); break;
+              case pyromat::Field::PRIMARY_AIR: id(primaerluftklappe).publish_state(item.value); break;
+              case pyromat::Field::SECONDARY_AIR: id(sekundaerluftklappe).publish_state(item.value); break;
+              case pyromat::Field::RETURN_VALVE_RAW: id(ventil_ruecklaufmischer).publish_state(item.value); break;
+              case pyromat::Field::BUFFER_VALVE_RAW: id(ventil_puffer).publish_state(item.value); break;
+              case pyromat::Field::UNKNOWN_117_1: id(register_0117_wert_1).publish_state(item.value); break;
+              case pyromat::Field::UNKNOWN_117_2: id(register_0117_wert_2).publish_state(item.value); break;
+              case pyromat::Field::STATE_RAW: id(betriebsstatus_rohwert).publish_state(item.value); break;
+              default: id(boiler_clock).update(item.field, item.value, millis()); break;
+            }
+          }
+
+button:
+  - platform: restart
+    id: esp_neustart
+    name: ESP neu starten
+    icon: mdi:restart
+    entity_category: config

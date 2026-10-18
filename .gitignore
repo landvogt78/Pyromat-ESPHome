@@ -1,5 +1,18 @@
-# Ignoriere die ESPHome Geheimnisse
+# Private credentials and local configuration
 secrets.yaml
+secrets.*.yaml
+!secrets.example.yaml
+*.local.yaml
 
-# Ignoriere auch die Build-Ordner von ESPHome
+# Build and development artifacts
 .esphome/
+.venv/
+node_modules/
+__pycache__/
+*.pyc
+.superpowers/
+build/
+*.exe
+decoder-test
+*.log
+.DS_Store

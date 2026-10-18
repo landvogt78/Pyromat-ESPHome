@@ -1,0 +1,8 @@
+mqtt:
+  broker: !secret mqtt_broker
+  port: !secret mqtt_port
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  topic_prefix: !secret mqtt_topic_prefix
+  discovery: true
+  reboot_timeout: 0s
