@@ -30,7 +30,9 @@ jobs:
         run: |
           g++ -std=c++17 -Wall -Wextra -Werror tests/decoder_test.cpp -o /tmp/pyromat-decoder-test
           /tmp/pyromat-decoder-test
-          node --test tests/dashboard.test.cjs
+          g++ -std=c++17 -Wall -Wextra -Werror -pthread tests/can_trace_test.cpp -o /tmp/pyromat-can-trace-test
+          /tmp/pyromat-can-trace-test
+          node --test tests/dashboard.test.cjs tests/can-detektiv.test.cjs
           python -m unittest discover -s tests -p 'test_*.py'
       - name: Lokale Test-Zugangsdaten erzeugen
         run: python tools/setup_secrets.py
