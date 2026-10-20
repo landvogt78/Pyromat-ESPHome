@@ -4,10 +4,21 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#ifdef USE_ESP32
+#include "esphome/core/helpers.h"
+#else
 #include <mutex>
+#endif
 #include <vector>
 
 namespace pyromat {
+#ifdef USE_ESP32
+using TraceMutex = esphome::Mutex;
+using TraceLock = esphome::LockGuard;
+#else
+using TraceMutex = std::mutex;
+using TraceLock = std::lock_guard<std::mutex>;
+#endif
 
 struct TraceFrame {
   uint32_t sequence{0};
@@ -33,23 +44,23 @@ class CanTrace {
  public:
   static constexpr size_t CAPACITY = 512;
   void start() {
-    std::lock_guard<std::mutex> lock(mutex_);
+    TraceLock lock(mutex_);
     reset_();
     ++generation_;
     running_ = true;
   }
   void stop() {
-    std::lock_guard<std::mutex> lock(mutex_);
+    TraceLock lock(mutex_);
     running_ = false;
   }
   void clear() {
-    std::lock_guard<std::mutex> lock(mutex_);
+    TraceLock lock(mutex_);
     reset_();
     ++generation_;
   }
   void capture(uint32_t can_id, const uint8_t *payload, size_t length, bool extended, bool rtr, uint32_t uptime_ms) {
     if (length > 8 || (length && payload == nullptr)) return;
-    std::lock_guard<std::mutex> lock(mutex_);
+    TraceLock lock(mutex_);
     if (!running_) return;
     if (size_ == CAPACITY) {
       head_ = (head_ + 1) % CAPACITY;
@@ -68,7 +79,7 @@ class CanTrace {
     for (size_t i = 0; i < length; ++i) frame.data[i] = payload[i];
   }
   TraceSnapshot snapshot(uint32_t after, size_t limit = 96) const {
-    std::lock_guard<std::mutex> lock(mutex_);
+    TraceLock lock(mutex_);
     TraceSnapshot out;
     out.running = running_;
     out.generation = generation_;
@@ -92,7 +103,7 @@ class CanTrace {
     last_sequence_ = 0;
     overwritten_ = 0;
   }
-  mutable std::mutex mutex_;
+  mutable TraceMutex mutex_;
   std::array<TraceFrame, CAPACITY> frames_{};
   size_t head_{0};
   size_t size_{0};
