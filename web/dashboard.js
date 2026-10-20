@@ -46,7 +46,48 @@
     page.addEventListener('pagehide',stop,{once:true});
     page.addEventListener('pageshow',event=>{if(event.persisted)page.location.reload();});
   }
-  const api = {entityKey, numeric, reading, format, eventReading, bindPageLifecycle, restartRequest};
+  function formatCanHex(id, extended=false, index=false) {
+    return '0x'+id.toString(16).toUpperCase().padStart(index?4:(extended?8:3),'0');
+  }
+  function parseTraceFrame(raw) {
+    if (!raw || !Number.isSafeInteger(raw.seq) || raw.seq<1 || !Number.isSafeInteger(raw.ms) || raw.ms<0 ||
+        !Number.isSafeInteger(raw.id) || raw.id<0 || typeof raw.ext!=='boolean' ||
+        typeof raw.rtr!=='boolean' || raw.id>(raw.ext?0x1FFFFFFF:0x7FF)) return null;
+    if (typeof raw.data!=='string' || raw.data.length>16 || raw.data.length%2!==0 || !/^[0-9a-f]*$/i.test(raw.data)) return null;
+    const data=raw.data.toUpperCase();
+    const index=!raw.ext && [0x23B,0x33B,0x43B,0x53B].includes(raw.id) && data.length>=4 ?
+      parseInt(data.slice(2,4)+data.slice(0,2),16) : null;
+    return {seq:raw.seq,ms:raw.ms,id:raw.id,ext:raw.ext,rtr:raw.rtr,data,index};
+  }
+  function parseDryRunFrame(inputId,inputData) {
+    const idValue=String(inputId||'').trim();
+    if(!/^(?:0x)?[0-9a-f]{1,3}$/i.test(idValue))return {error:'CAN-ID als Hexzahl eingeben, z. B. 0x23B.'};
+    const id=parseInt(idValue.replace(/^0x/i,''),16);
+    if(id>0x7FF)return {error:'CAN-ID muss zwischen 0x000 und 0x7FF liegen.'};
+    const data=String(inputData||'').replace(/[\s,\-:]/g,'').toUpperCase();
+    if(!data || data.length%2!==0 || !/^[0-9A-F]+$/.test(data))return {error:'Daten als vollständige HEX-Bytes eingeben.'};
+    if(data.length>16)return {error:'Maximal 8 Datenbytes je Standard-CAN-Telegramm.'};
+    return {id,hexId:formatCanHex(id),data};
+  }
+  function changedBytes(before,after) {
+    if (before===null || before===undefined)return [];
+    const previous=String(before),current=String(after), result=[];
+    for(let i=0;i<Math.max(previous.length,current.length)/2;i++) {
+      if(previous.slice(i*2,i*2+2)!==current.slice(i*2,i*2+2))result.push(i);
+    }
+    return result;
+  }
+  function traceCsv(rows) {
+    const lines=['Zeit_ms;Sequenz;CAN_ID;Format;RTR;Index;Daten_HEX'];
+    rows.forEach(row=>{
+      if(!row || typeof row.seq!=='number' || typeof row.data!=='string')return;
+      lines.push([row.ms,row.seq,formatCanHex(row.id,row.ext),row.ext?'Extended':'Standard',row.rtr?'Ja':'Nein',
+        row.index===null?'':formatCanHex(row.index,false,true),row.data].join(';'));
+    });
+    return lines.join('\r\n')+'\r\n';
+  }
+  const api = {entityKey, numeric, reading, format, eventReading, bindPageLifecycle, restartRequest,
+    formatCanHex,parseTraceFrame,parseDryRunFrame,changedBytes,traceCsv};
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof window !== 'undefined') window.PyromatDashboard = api;
 })();
@@ -62,9 +103,9 @@
     abgastemperatur:['Abgastemperatur','°C',1], kesselruecklauf:['Kesselrücklauf','°C',1],
     systemtemperatur:['Systemtemperatur','°C',1], puffer_oben:['Puffer oben','°C',1],
     puffer_mitte:['Puffer Mitte','°C',1], puffer_unten:['Puffer unten','°C',1], heizungsvorlauf:['Heizungsvorlauf','°C',1],
-    restsauerstoff:['Restsauerstoff','%',1], restsauerstoff_soll_kandidat:['Restsauerstoff Soll','%',1,'candidate'],
+    restsauerstoff:['Restsauerstoff','%',1], restsauerstoff_soll:['Restsauerstoff Soll','%',1],
     luefterdrehzahl:['Lüfterdrehzahl','rpm',0], primaerluftklappe:['Primärluftklappe','%',0], sekundaerluftklappe:['Sekundärluftklappe','%',0],
-    ventil_ruecklaufmischer_rohwert:['Rücklaufmischer · Rohwert','',0,'raw'], ventil_puffer_rohwert:['Pufferventil · Rohwert','',0,'raw'],
+    register_0x007b_w3_rohwert:['Register 0x007B/W3 · ungeklärt','',0,'raw'], register_0x007e_w2_rohwert:['Register 0x007E/W2 · ungeklärt','',0,'raw'],
     register_0117_wert_1:['Register 0x0117 · Wert 1','',0,'raw'], register_0117_wert_2:['Register 0x0117 · Wert 2','',0,'raw'],
     betriebsstatus_rohwert:['Betriebsstatus · Rohwert','',0,'raw'], kesseluhr:['Kesseluhr','','text'],
     kesseldatum:['Kesseldatum','','text'], kesselwochentag:['Wochentag','','text'],
@@ -74,6 +115,7 @@
     can_empfang:['CAN-Empfang','','binary'], wlan_verbindung:['WLAN-Verbindung','','binary','system']
   };
   const icons = {
+    trace:'<path d="M2 8h4l3 7 4-12 3 9h6"/><path d="M2 19h20"/>',
     home:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
     list:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
     pulse:'<path d="M2 12h5l3-8 4 16 3-8h5"/>',
@@ -117,16 +159,48 @@
   const shell=document.createElement('div');
   shell.innerHTML=(preview?`<div class="preview-banner"><strong>VORSCHAU · Beispieldaten</strong><span>Keine Verbindung zu einem Kessel</span><button data-demo="live" aria-pressed="true">Beispieldaten</button><button data-demo="empty" aria-pressed="false">Ohne Daten</button><button data-demo="offline" aria-pressed="false">Verbindungsausfall</button></div>`:'')+`
     <aside class="sidebar"><div class="brand"><div class="brand-mark">${icon('flame')}</div><div><strong>pyromat</strong><small>ECOTRONIC MONITOR</small></div></div><div class="nav-label">DEINE ANLAGE</div>
-    <nav class="nav" role="tablist" aria-label="Ansichten"><button id="tab-overview" role="tab" aria-selected="true" aria-controls="view-overview" data-tab="overview">${icon('home')}Übersicht</button><button id="tab-values" role="tab" aria-selected="false" aria-controls="view-values" data-tab="values">${icon('list')}Alle Werte</button><button id="tab-diagnostics" role="tab" aria-selected="false" aria-controls="view-diagnostics" data-tab="diagnostics">${icon('pulse')}Diagnose</button></nav>
+    <nav class="nav" role="tablist" aria-label="Ansichten"><button id="tab-overview" role="tab" aria-selected="true" aria-controls="view-overview" data-tab="overview">${icon('home')}Übersicht</button><button id="tab-values" role="tab" aria-selected="false" aria-controls="view-values" data-tab="values">${icon('list')}Alle Werte</button><button id="tab-diagnostics" role="tab" aria-selected="false" aria-controls="view-diagnostics" data-tab="diagnostics">${icon('pulse')}Diagnose</button><button id="tab-can" role="tab" aria-selected="false" aria-controls="view-can" data-tab="can">${icon('trace')}CAN-Detektiv</button></nav>
     <div class="sidebar-bottom"><div class="device-label"><b>Lokale Verbindung</b>ESP32 · CAN · ESPHome</div><div class="version">PYROMAT ESPHOME · 2.0</div></div></aside>
     <main class="layout"><header class="header"><div><div class="eyebrow">DEIN HEIZRAUM. DIREKT VERBUNDEN.</div><h1 id="device-title">Pyromat Eco</h1><p>Wärme, Temperaturen und Zustände auf einen Blick.</p></div><div class="header-actions"><button id="theme-button" class="icon-button" aria-label="Darstellung wechseln" title="Hell / Dunkel">${icon('sun')}</button><button id="restart-button" class="button" aria-label="ESP neu starten" title="ESP neu starten" disabled>${icon('restart')}<span class="restart-label">ESP neu starten</span></button></div></header>
     <div class="status-strip" aria-live="polite"><span class="badge" id="connection-badge"><span class="dot"></span><span id="connection-label">Verbindung wird aufgebaut</span></span><span class="badge" id="can-badge"><span class="dot"></span><span id="can-label">Warte auf CAN-Daten</span></span><span class="status-right">Letztes CAN-Telegramm: <span data-value="can_datenalter">—</span> s</span></div>
     <div class="view" role="tabpanel" aria-labelledby="tab-overview" id="view-overview"><div class="metrics">${metric('kesseltemperatur','Empfangener Messwert','warm','temperature')}${metric('abgastemperatur','Empfangener Messwert','neutral','flame')}${metric('restsauerstoff','Empfangener Messwert','green','air')}${metric('luefterdrehzahl','Empfangener Messwert','blue','fan')}</div>
     <section class="panel hydraulic"><div class="panel-head"><div><h2>Anlagenübersicht</h2><p>Kessel, Pufferspeicher und Heizkreis</p></div><span class="badge">HYDRAULIKSCHEMA</span></div><div class="hydraulic-body">${diagram}</div><div class="hydraulic-foot"><div class="legend"><span><i></i>Vorlauf</span><span><i class="cold"></i>Rücklauf</span></div><p>Schematische Darstellung · Temperaturen aus dem CAN-Bus</p></div></section>
-    <div class="bottom-grid"><section class="panel"><div class="panel-head"><h2>Verbrennung &amp; Luft</h2></div><div class="rows">${['primaerluftklappe','sekundaerluftklappe'].map(key=>'<div class="row bar-row"><span class="row-name">'+fields[key][0]+'</span><div class="bar"><i data-bar="'+key+'"></i></div><span class="row-value">'+value(key)+'<small>%</small></span></div>').join('')}${row('kesseltemperatur_soll')}${row('restsauerstoff_soll_kandidat')}</div></section>
+    <div class="bottom-grid"><section class="panel"><div class="panel-head"><h2>Verbrennung &amp; Luft</h2></div><div class="rows">${['primaerluftklappe','sekundaerluftklappe'].map(key=>'<div class="row bar-row"><span class="row-name">'+fields[key][0]+'</span><div class="bar"><i data-bar="'+key+'"></i></div><span class="row-value">'+value(key)+'<small>%</small></span></div>').join('')}${row('kesseltemperatur_soll')}${row('restsauerstoff_soll')}</div></section>
     <section class="panel"><div class="panel-head"><h2>Kesseluhr</h2><span class="badge">VOM KESSEL</span></div><div class="clock">${value('kesseluhr')}</div><div class="clock-sub">${value('kesselwochentag')} · ${value('kesseldatum')}</div><div class="clock-note">Zuletzt empfangene Kesselzeit · aktualisiert sich mit den Telegrammen</div></section></div></div>
-    <div class="view" role="tabpanel" aria-labelledby="tab-values" id="view-values" hidden><div class="section-title"><h2>Alle Messwerte</h2><p>Empfangene Werte deiner Anlage. Ein Strich bedeutet: noch kein gültiger Messwert.</p></div><div class="value-groups">${panel('Kessel & Heizkreis',['kesseltemperatur','kesseltemperatur_soll','kesselruecklauf','systemtemperatur','abgastemperatur','heizungsvorlauf'])}${panel('Pufferspeicher',['puffer_oben','puffer_mitte','puffer_unten'])}${panel('Verbrennung & Luft',['restsauerstoff','restsauerstoff_soll_kandidat','luefterdrehzahl','primaerluftklappe','sekundaerluftklappe'])}${panel('Datum & Uhrzeit',['kesseluhr','kesseldatum','kesselwochentag'])}</div></div>
-    <div class="view" role="tabpanel" aria-labelledby="tab-diagnostics" id="view-diagnostics" hidden><div class="section-title"><h2>Verbindung & Diagnose</h2><p>Empfang, Netzwerk und noch nicht zugeordnete Datenfelder.</p></div><div class="notice"><strong>Rohwerte bleiben Rohwerte.</strong> Ventil- und Statuskennungen sind noch nicht vollständig entschlüsselt. Sie werden ohne erfundene Einheit angezeigt. Der Sauerstoff-Sollwert ist ein Kandidat und muss am Kesseldisplay bestätigt werden.</div><div class="value-groups">${panel('CAN-Bus',['can_empfang','can_datenalter','can_telegramme','betriebsstatus_rohwert'])}${panel('ESP32 & Netzwerk',['wlan_verbindung','wlan_signal','betriebszeit','ip_adresse','wlan_name'])}${panel('Ventile · Zuordnung offen',['ventil_ruecklaufmischer_rohwert','ventil_puffer_rohwert'])}${panel('Weitere Register · Zuordnung offen',['register_0117_wert_1','register_0117_wert_2'])}</div></div>
+    <div class="view" role="tabpanel" aria-labelledby="tab-values" id="view-values" hidden><div class="section-title"><h2>Alle Messwerte</h2><p>Empfangene Werte deiner Anlage. Ein Strich bedeutet: noch kein gültiger Messwert.</p></div><div class="value-groups">${panel('Kessel & Heizkreis',['kesseltemperatur','kesseltemperatur_soll','kesselruecklauf','systemtemperatur','abgastemperatur','heizungsvorlauf'])}${panel('Pufferspeicher',['puffer_oben','puffer_mitte','puffer_unten'])}${panel('Verbrennung & Luft',['restsauerstoff','restsauerstoff_soll','luefterdrehzahl','primaerluftklappe','sekundaerluftklappe'])}${panel('Datum & Uhrzeit',['kesseluhr','kesseldatum','kesselwochentag'])}</div></div>
+    <div class="view" role="tabpanel" aria-labelledby="tab-diagnostics" id="view-diagnostics" hidden><div class="section-title"><h2>Verbindung & Diagnose</h2><p>Empfang, Netzwerk und noch nicht zugeordnete Datenfelder.</p></div><div class="notice"><strong>Rohwerte bleiben Rohwerte.</strong> Die früher als Rücklaufmischer und Pufferventil interpretierten Rohfelder 0x007B/W3 und 0x007E/W2 sind nicht plausibel zugeordnet. O₂-Sollwert und Kesseluhr wurden am Projektkessel bestätigt.</div><div class="value-groups">${panel('CAN-Bus',['can_empfang','can_datenalter','can_telegramme','betriebsstatus_rohwert'])}${panel('ESP32 & Netzwerk',['wlan_verbindung','wlan_signal','betriebszeit','ip_adresse','wlan_name'])}${panel('Ungeklärte Register · keine bestätigten Ventilwerte',['register_0x007b_w3_rohwert','register_0x007e_w2_rohwert'])}${panel('Weitere Register · Zuordnung offen',['register_0117_wert_1','register_0117_wert_2'])}</div></div>
+    <div class="view" role="tabpanel" aria-labelledby="tab-can" id="view-can" hidden>
+      <div class="section-title"><h2>CAN-Detektiv</h2><p>Telegramme lokal untersuchen und für die Protokollanalyse exportieren. Der ESP32 sendet keine CAN-Steuerbefehle.</p></div>
+      <section class="panel trace-panel">
+        <div class="panel-head"><div><h2>Live-Mitschnitt</h2><p>125 kbit/s · Standard- und Extended-Frames · 512 Einträge im ESP32-Ringpuffer</p></div><span class="badge" id="trace-running">Aus</span></div>
+        <div class="trace-controls">
+          <button class="button primary" id="trace-start" type="button">Aufzeichnen</button>
+          <button class="button" id="trace-stop" type="button">Stoppen</button>
+          <button class="button" id="trace-clear" type="button">Löschen</button>
+          <button class="button" id="trace-reference" type="button">Referenz setzen</button>
+          <button class="button" id="trace-marker" type="button">Markierung</button>
+          <button class="button" id="trace-export" type="button">CSV exportieren</button>
+        </div>
+        <p id="trace-state" class="trace-state" role="status">Noch keine Daten. Aufzeichnung ist nach jedem ESP-Neustart ausgeschaltet.</p>
+        <div class="trace-filters">
+          <label>CAN-ID (Hex)<input id="trace-filter-id" placeholder="z. B. 0x23B" autocomplete="off"></label>
+          <label>16-Bit-Index (Hex)<input id="trace-filter-index" placeholder="z. B. 0x008D" autocomplete="off"></label>
+          <label><input type="checkbox" id="trace-filter-delta"> Nur Änderungen zur Referenz</label>
+        </div>
+        <div class="trace-scroll"><table class="trace-table"><thead><tr><th>Uptime</th><th>Seq</th><th>CAN-ID</th><th>Index</th><th>Rohdaten (HEX)</th><th>Format</th></tr></thead><tbody id="trace-rows"><tr><td colspan="6">Noch keine Aufzeichnung</td></tr></tbody></table></div>
+        <p id="trace-notices" class="trace-notices">Keine verlorenen Pakete erfasst. Der MCP2515 kann bei hoher Buslast dennoch Telegramme vor der Aufzeichnung verlieren.</p>
+      </section>
+      <section class="panel trace-panel">
+        <div class="panel-head"><div><h2>Schreibtest-Labor (Simulation)</h2><p>CAN-Frame zusammenstellen und validieren. Keine Übertragung an die Ecotronic.</p></div><span class="badge">Gesperrt · Nur Vorschau</span></div>
+        <div class="trace-filters">
+          <label>Standard-CAN-ID (HEX)<input id="trace-tx-id" value="0x23B" autocomplete="off"></label>
+          <label>Datenbytes (maximal 8)<input id="trace-tx-data" value="8D 00 7F 00 46 00 CD 01" autocomplete="off"></label>
+          <button class="button" id="trace-tx-preview" type="button">Frame prüfen</button>
+        </div>
+        <pre id="trace-tx-result" class="trace-tx-result" aria-live="polite">Es werden keine Nachrichten gesendet.</pre>
+        <p class="trace-notices"><strong>ACHTUNG:</strong> Weder Hex-Eingabe noch Kopieren verändern den Kessel. Ein späterer realer Schreibzugriff benötigt nachgewiesenes Protokoll, zugelassene Testparameter und eigene physische Freigabe.</p>
+      </section>
+    </div>
     <footer class="footer"><span>Pyromat ESPHome · Lokaler Anlagenmonitor</span><a href="https://github.com/landvogt78/Pyromat-ESPHome" target="_blank" rel="noopener noreferrer">Dokumentation &amp; Projekt ↗</a></footer></main>
     <div id="toast" class="toast" role="status" hidden></div><div id="restart-modal" class="modal-backdrop" hidden><section class="modal" role="dialog" aria-modal="true" aria-labelledby="restart-title" aria-describedby="restart-description"><h2 id="restart-title">ESP32 neu starten?</h2><p id="restart-description">Die Datenverbindung wird kurz unterbrochen. Der Heizkessel selbst wird dadurch nicht neu gestartet.</p><div class="modal-actions"><button id="restart-cancel" class="button">Abbrechen</button><button id="restart-confirm" class="button danger">Jetzt neu starten</button></div></section></div>`;
   document.body.replaceChildren(shell);
@@ -223,8 +297,8 @@
   });
   const sample={kesseltemperatur:77.4,kesseltemperatur_soll:86,abgastemperatur:168.2,kesselruecklauf:63.1,
     systemtemperatur:76.8,puffer_oben:76.2,puffer_mitte:57.8,puffer_unten:34.6,heizungsvorlauf:38.5,
-    restsauerstoff:6.8,restsauerstoff_soll_kandidat:7,luefterdrehzahl:1380,primaerluftklappe:42,sekundaerluftklappe:31,
-    ventil_ruecklaufmischer_rohwert:62736,ventil_puffer_rohwert:2800,register_0117_wert_1:140,register_0117_wert_2:980,
+    restsauerstoff:6.8,restsauerstoff_soll:7,luefterdrehzahl:1380,primaerluftklappe:42,sekundaerluftklappe:31,
+    register_0x007b_w3_rohwert:62736,register_0x007e_w2_rohwert:2800,register_0117_wert_1:140,register_0117_wert_2:980,
     betriebsstatus_rohwert:6,kesseluhr:'14:32:08',kesseldatum:'30.10.2024',kesselwochentag:'Mittwoch',can_datenalter:2,
     can_telegramme:181073,wlan_signal:-58,betriebszeit:86400,ip_adresse:'192.168.1.42',wlan_name:'Heimnetz',can_empfang:true,wlan_verbindung:true};
   function loadPreview(state) {
