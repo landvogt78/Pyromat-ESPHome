@@ -1,0 +1,273 @@
+# Messwerte werden bei ausbleibenden Telegrammen ungueltig statt eingefroren.
+# Kein delta-Filter: auch konstante, erneut empfangene Werte halten den Timeout frisch.
+sensor:
+  - platform: template
+    id: kesseltemperatur
+    name: "Kesseltemperatur"
+    update_interval: never
+    accuracy_decimals: 1
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    filters:
+      - timeout: 60s
+
+  - platform: template
+    id: soll_kesseltemperatur
+    name: "Kesseltemperatur Soll"
+    update_interval: never
+    accuracy_decimals: 1
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    filters:
+      - timeout: 60s
+
+  - platform: template
+    id: abgastemperatur
+    name: "Abgastemperatur"
+    update_interval: never
+    accuracy_decimals: 1
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    filters:
+      - timeout: 60s
+
+  - platform: template
+    id: kesselruecklauf
+    name: "Kesselruecklauf"
+    update_interval: never
+    accuracy_decimals: 1
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    filters:
+      - timeout: 60s
+
+  - platform: template
+    id: systemtemperatur
+    name: "Systemtemperatur"
+    update_interval: never
+    accuracy_decimals: 1
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    filters:
+      - timeout: 60s
+
+  - platform: template
+    id: puffer_oben
+    name: "Puffer oben"
+    update_interval: never
+    accuracy_decimals: 1
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    filters:
+      - timeout: 60s
+
+  - platform: template
+    id: puffer_mitte
+    name: "Puffer Mitte"
+    update_interval: never
+    accuracy_decimals: 1
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    filters:
+      - timeout: 60s
+
+  - platform: template
+    id: puffer_unten
+    name: "Puffer unten"
+    update_interval: never
+    accuracy_decimals: 1
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    filters:
+      - timeout: 60s
+
+  - platform: template
+    id: heizungsvorlauf
+    name: "Heizungsvorlauf"
+    update_interval: never
+    accuracy_decimals: 1
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    filters:
+      - timeout: 60s
+
+  - platform: template
+    id: restsauerstoff
+    name: "Restsauerstoff"
+    update_interval: never
+    accuracy_decimals: 1
+    unit_of_measurement: "%"
+    state_class: measurement
+    filters:
+      - timeout: 60s
+
+  - platform: template
+    id: soll_restsauerstoff
+    name: "Restsauerstoff Soll Kandidat"
+    update_interval: never
+    accuracy_decimals: 1
+    unit_of_measurement: "%"
+    state_class: measurement
+    entity_category: diagnostic
+    filters:
+      - timeout: 60s
+
+  - platform: template
+    id: luefterdrehzahl
+    name: "Luefterdrehzahl"
+    update_interval: never
+    accuracy_decimals: 0
+    unit_of_measurement: "rpm"
+    state_class: measurement
+    filters:
+      - timeout: 60s
+
+  - platform: template
+    id: primaerluftklappe
+    name: "Primaerluftklappe"
+    update_interval: never
+    accuracy_decimals: 0
+    unit_of_measurement: "%"
+    state_class: measurement
+    filters:
+      - timeout: 60s
+
+  - platform: template
+    id: sekundaerluftklappe
+    name: "Sekundaerluftklappe"
+    update_interval: never
+    accuracy_decimals: 0
+    unit_of_measurement: "%"
+    state_class: measurement
+    filters:
+      - timeout: 60s
+
+  - platform: template
+    id: ventil_ruecklaufmischer
+    name: "Ventil Ruecklaufmischer Rohwert"
+    update_interval: never
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    filters:
+      - timeout: 60s
+
+  - platform: template
+    id: ventil_puffer
+    name: "Ventil Puffer Rohwert"
+    update_interval: never
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    filters:
+      - timeout: 60s
+
+  - platform: template
+    id: register_0117_wert_1
+    name: "Register 0117 Wert 1"
+    update_interval: never
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    filters:
+      - timeout: 60s
+
+  - platform: template
+    id: register_0117_wert_2
+    name: "Register 0117 Wert 2"
+    update_interval: never
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    filters:
+      - timeout: 60s
+
+  - platform: template
+    id: betriebsstatus_rohwert
+    name: "Betriebsstatus Rohwert"
+    update_interval: never
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    filters:
+      - timeout: 60s
+
+  - platform: template
+    id: can_datenalter
+    name: CAN Datenalter
+    unit_of_measurement: s
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    update_interval: 5s
+    lambda: |-
+      if (!id(can_seen)) return NAN;
+      return static_cast<uint32_t>(millis() - id(last_can_ms)) / 1000.0f;
+
+  - platform: template
+    id: can_telegramme
+    name: CAN Telegramme
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    update_interval: 10s
+    lambda: return id(can_frames);
+
+  - platform: wifi_signal
+    id: wlan_signal
+    name: WLAN Signal
+    update_interval: 30s
+    entity_category: diagnostic
+
+  - platform: uptime
+    id: betriebszeit
+    name: Betriebszeit
+    update_interval: 30s
+    entity_category: diagnostic
+
+binary_sensor:
+  - platform: template
+    name: WLAN Verbindung
+    device_class: connectivity
+    entity_category: diagnostic
+    lambda: return wifi::global_wifi_component->is_connected();
+  - platform: template
+    id: can_empfang
+    name: CAN Empfang
+    device_class: connectivity
+    entity_category: diagnostic
+    lambda: |-
+      return id(can_seen) && static_cast<uint32_t>(millis() - id(last_can_ms)) <= 30000;
+
+text_sensor:
+  - platform: template
+    id: kesseluhr
+    name: Kesseluhr
+    icon: mdi:clock-outline
+    update_interval: 5s
+    lambda: |-
+      const auto value = id(boiler_clock).time(millis());
+      return value.empty() ? std::string("Keine Daten") : value;
+  - platform: template
+    id: kesseldatum
+    name: Kesseldatum
+    icon: mdi:calendar
+    update_interval: 5s
+    lambda: |-
+      const auto value = id(boiler_clock).date(millis());
+      return value.empty() ? std::string("Keine Daten") : value;
+  - platform: template
+    id: kesselwochentag
+    name: Kesselwochentag
+    entity_category: diagnostic
+    update_interval: 5s
+    lambda: return id(boiler_clock).weekday(millis());
+  - platform: wifi_info
+    ip_address:
+      name: IP Adresse
+      entity_category: diagnostic
+    ssid:
+      name: WLAN Name
+      entity_category: diagnostic

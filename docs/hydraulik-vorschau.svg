@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="550" viewBox="0 0 1200 550" role="img" aria-labelledby="preview-title">
+<title id="preview-title">Pyromat ESPHome – Hydraulikschema mit Beispieldaten</title>
+<style>text{font-family:system-ui,-apple-system,Segoe UI,sans-serif;fill:#22352f}.diagram-label{font-size:12px;font-weight:650;letter-spacing:1px}.diagram-note{font-size:9px}.diagram-muted{fill:#75827a}.diagram-value{font-weight:650;font-size:15px}.diagram-pipe-hot{fill:none;stroke:#ce8259;stroke-width:5;stroke-linecap:round}.diagram-pipe-cold{fill:none;stroke:#7097ad;stroke-width:5;stroke-linecap:round}.diagram-chip{fill:#f8f8f4;stroke:#e4e8e0}</style>
+<rect width="1200" height="550" rx="20" fill="#f4f4ef"/><rect x="22" y="22" width="1156" height="506" rx="14" fill="#fff" stroke="#e4e8e0"/>
+<text x="56" y="66" style="font-size:24px;font-weight:650">pyromat <tspan fill="#75827a" style="font-size:16px;font-weight:400">Anlagenübersicht</tspan></text>
+<rect x="855" y="39" width="288" height="31" rx="7" fill="#fbede4"/><text x="999" y="59" text-anchor="middle" style="font-size:12px;fill:#8b4d2e">VORSCHAU · BEISPIELDATEN</text>
+<text x="56" y="94" style="font-size:12px;fill:#75827a">Kessel, Pufferspeicher und Heizkreis · lokaler ESPHome-Monitor</text>
+<svg x="110" y="102" width="980" height="398" viewBox="0 0 900 365" role="img" aria-labelledby="hydraulic-title hydraulic-desc">
+    <title id="hydraulic-title">Kessel, Pufferspeicher und Heizkreis</title><desc id="hydraulic-desc">Vereinfachtes Hydraulikschema mit den empfangenen Temperaturwerten. Kein verbindlicher Anlagenplan.</desc>
+    <defs><linearGradient id="tank-gradient" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#e8b18b"/><stop offset=".52" stop-color="#e8d2ac"/><stop offset="1" stop-color="#a3bec3"/></linearGradient></defs>
+    <path class="diagram-pipe-hot" d="M239 129H399M517 99H732V129"/><path class="diagram-pipe-cold" d="M239 276H399M517 276H794V232"/>
+    <path d="m309 124 8 5-8 5m305-40 8 5-8 5" fill="none" stroke="#ce8259" stroke-width="2"/><path d="m327 271-8 5 8 5m312-5-8 5 8 5" fill="none" stroke="#7097ad" stroke-width="2"/>
+    <text x="160" y="39" text-anchor="middle" class="diagram-label">PYROMAT ECO</text><text x="459" y="39" text-anchor="middle" class="diagram-label">PUFFERSPEICHER</text><text x="761" y="39" text-anchor="middle" class="diagram-label">HEIZKREIS</text>
+    <rect x="81" y="70" width="159" height="238" rx="13" fill="#344b3e"/><rect x="91" y="80" width="139" height="218" rx="9" fill="#3e5747"/>
+    <rect x="107" y="99" width="106" height="40" rx="5" fill="#293d31"/><text x="160" y="124" text-anchor="middle" fill="#eaf1df" style="fill:#eaf1df;font-size:20px" class="diagram-value" data-value="kesseltemperatur">77,4</text>
+    <rect x="107" y="155" width="106" height="99" rx="7" fill="#2c4033" stroke="#6d8270" stroke-width="1"/><path d="M163 178c3 14-15 17-7 30 1-5 6-8 8-10 0 7 9 10 9 17a15 15 0 0 1-30 0c0-13 6-26 20-37Z" fill="#d5a479" opacity=".9"/>
+    <path d="M146 270h29" stroke="#a4b39b" stroke-width="3" stroke-linecap="round"/><rect x="99" y="307" width="15" height="7" rx="2" fill="#293d31"/><rect x="207" y="307" width="15" height="7" rx="2" fill="#293d31"/>
+    <rect x="399" y="68" width="118" height="245" rx="35" fill="url(#tank-gradient)" stroke="#c9c8b3"/><path d="M405 148h106M405 231h106" stroke="#fff" stroke-opacity=".5" stroke-dasharray="3 5"/>
+    <rect x="426" y="86" width="64" height="24" rx="5" fill="#ffffff7a"/><text x="458" y="102" text-anchor="middle" style="font-size:12px" class="diagram-value" data-value="puffer_oben">76,2</text>
+    <rect x="426" y="178" width="64" height="24" rx="5" fill="#ffffff7a"/><text x="458" y="194" text-anchor="middle" style="font-size:12px" class="diagram-value" data-value="puffer_mitte">57,8</text>
+    <rect x="426" y="270" width="64" height="24" rx="5" fill="#ffffff7a"/><text x="458" y="286" text-anchor="middle" style="font-size:12px" class="diagram-value" data-value="puffer_unten">34,6</text>
+    <text x="459" y="128" text-anchor="middle" class="diagram-note diagram-tank-label">OBEN · °C</text><text x="459" y="219" text-anchor="middle" class="diagram-note diagram-tank-label">MITTE · °C</text><text x="459" y="334" text-anchor="middle" class="diagram-note diagram-tank-label">UNTEN · °C</text>
+    <rect x="711" y="130" width="105" height="102" rx="8" fill="#f8f8f4" stroke="#a4b09e" stroke-width="2"/><path d="M730 143v75m20-75v75m20-75v75m20-75v75" stroke="#b9c3b0" stroke-width="7" stroke-linecap="round"/>
+    <rect x="268" y="75" width="103" height="36" rx="7" class="diagram-chip"/><text x="319" y="98" text-anchor="middle" class="diagram-value" style="font-size:13px" data-value="kesseltemperatur">77,4</text><text x="319" y="63" text-anchor="middle" class="diagram-note diagram-muted">KESSEL · °C</text>
+    <rect x="268" y="296" width="103" height="36" rx="7" class="diagram-chip"/><text x="319" y="319" text-anchor="middle" class="diagram-value" style="font-size:13px" data-value="kesselruecklauf">63,1</text><text x="319" y="350" text-anchor="middle" class="diagram-note diagram-muted">RÜCKLAUF · °C</text>
+    <rect x="600" y="47" width="103" height="36" rx="7" class="diagram-chip"/><text x="652" y="70" text-anchor="middle" class="diagram-value" style="font-size:13px" data-value="heizungsvorlauf">38,5</text><text x="652" y="31" text-anchor="middle" class="diagram-note diagram-muted">VORLAUF · °C</text>
+    </svg>
+<text x="56" y="504" style="font-size:11px;fill:#75827a">Schematische Darstellung · kein individueller Anlagenplan · keine Verbindung zu einem Kessel</text></svg>

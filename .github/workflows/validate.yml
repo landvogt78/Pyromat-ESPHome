@@ -1,0 +1,44 @@
+name: Firmware und Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          package-manager-cache: false
+      - name: ESPHome installieren
+        run: python -m pip install -r requirements.txt
+      - name: Decoder und Oberflaechenlogik testen
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror tests/decoder_test.cpp -o /tmp/pyromat-decoder-test
+          /tmp/pyromat-decoder-test
+          node --test tests/dashboard.test.cjs
+          python -m unittest discover -s tests -p 'test_*.py'
+      - name: Lokale Test-Zugangsdaten erzeugen
+        run: python tools/setup_secrets.py
+      - name: Beide Konfigurationen pruefen
+        run: |
+          esphome config pyromat.yaml
+          esphome config pyromat-api.yaml
+      - name: Firmware mit MQTT bauen
+        run: esphome compile pyromat.yaml
+      - name: Firmware ohne MQTT bauen
+        run: esphome compile pyromat-api.yaml
