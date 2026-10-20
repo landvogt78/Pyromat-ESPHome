@@ -337,3 +337,168 @@
   },1000);
   bindPageLifecycle(window,()=>{clearInterval(refresh);if(source)source.close();});
 })();
+
+
+/* CAN trace UI: read-only HTTP polling, local CSV and dry-run-only frame validation. */
+(function () {
+  'use strict';
+  if (typeof document === 'undefined') return;
+  const panel=document.getElementById('view-can');
+  if (!panel) return;
+  const api=window.PyromatDashboard;
+  const el=id=>document.getElementById(id);
+  const preview=document.documentElement.dataset.preview==='true';
+  const history=[], markers=[];
+  const references=new Map();
+  let generation=null,cursor=0,recording=false,overwritten=0,missed=0,localPruned=0,pending=false,closed=false,error='';
+  const maxHistory=3000;
+  const key=frame=>api.formatCanHex(frame.id,frame.ext)+'/'+(frame.index===null?'-':api.formatCanHex(frame.index,false,true));
+  const hexFilter=(text,max)=>{
+    const input=text.trim().replace(/^0x/i,'');
+    if(!input)return null;
+    if(!/^[0-9a-f]+$/i.test(input))return undefined;
+    const value=parseInt(input,16);
+    return value<=max?value:undefined;
+  };
+  function visibleFrames() {
+    const id=hexFilter(el('trace-filter-id').value,0x1FFFFFFF);
+    const index=hexFilter(el('trace-filter-index').value,0xFFFF);
+    if(id===undefined || index===undefined)return [];
+    return history.filter(frame=>(id===null || frame.id===id) && (index===null || frame.index===index) &&
+      (!el('trace-filter-delta').checked || frame.diff.length>0));
+  }
+  function renderTrace() {
+    el('trace-running').textContent=recording?'Aufzeichnung aktiv':'Aus / angehalten';
+    el('trace-running').className='badge '+(recording?'good':'warn');
+    const data=visibleFrames();
+    const latest=data.slice(-150).reverse();
+    el('trace-rows').innerHTML=latest.map(frame=>{
+      const octets=frame.data.match(/.{2}/g)||[];
+      const raw=octets.map((byte,i)=>frame.diff.includes(i)?'<mark class="trace-delta">'+byte+'</mark>':byte).join(' ');
+      return '<tr><td>'+frame.ms+'</td><td>'+frame.seq+'</td><td>'+api.formatCanHex(frame.id,frame.ext)+'</td><td>'+
+        (frame.index===null?'—':api.formatCanHex(frame.index,false,true))+'</td><td class="trace-hex">'+raw+'</td><td>'+
+        (frame.ext?'Extended':'Standard')+(frame.rtr?' · RTR':'')+'</td></tr>';
+    }).join('')||'<tr><td colspan="6">Keine passenden Telegramme</td></tr>';
+    el('trace-state').textContent=(preview?'Vorschau · keine Verbindung zum Pyromat. ':recording?'Mitschnitt aktiv. ':'Mitschnitt aus. ')+
+      'Im Browser: '+history.length+' Telegramme; zuletzt #'+cursor+'.'+(error?' Fehler: '+error:'');
+    el('trace-notices').textContent='Ringpuffer-Überschreibungen: '+overwritten+' · Nicht rechtzeitig abgerufene Telegramme: '+missed+
+      ' · Aus Browser-RAM entfernt: '+localPruned+' · Markierungen: '+markers.length+
+      '. Hardwareseitige MCP2515-Verluste sind nicht messbar.';
+  }
+  function resetClient() {
+    history.length=0;
+    markers.length=0;
+    references.clear();
+    cursor=0;
+    missed=0;
+    overwritten=0;
+    localPruned=0;
+  }
+  function applyPacket(packet) {
+    if (!packet || typeof packet.running!=='boolean' || !Number.isSafeInteger(packet.generation) ||
+        !Array.isArray(packet.frames) || !Number.isSafeInteger(packet.overwritten) ||
+        !Number.isSafeInteger(packet.missed))throw new Error('Ungültige CAN-Antwort');
+    if (generation!==packet.generation) {
+      resetClient();
+      generation=packet.generation;
+    }
+    recording=packet.running;
+    overwritten=packet.overwritten;
+    missed+=packet.missed;
+    for(const raw of packet.frames) {
+      const frame=api.parseTraceFrame(raw);
+      if(!frame || frame.seq<=cursor)continue;
+      const reference=references.get(key(frame));
+      frame.diff=reference===undefined?[]:api.changedBytes(reference,frame.data);
+      history.push(frame);
+      cursor=frame.seq;
+    }
+    if(history.length>maxHistory) {
+      const count=history.length-maxHistory;
+      history.splice(0,count);
+      localPruned+=count;
+    }
+    error='';
+    renderTrace();
+  }
+  async function poll() {
+    if(preview || closed || panel.hidden || document.hidden || pending)return;
+    pending=true;
+    const timeout=new AbortController();
+    const deadline=setTimeout(()=>timeout.abort(),4500);
+    try {
+      const response=await fetch('/can/trace?after='+cursor,{method:'GET',credentials:'same-origin',cache:'no-store',signal:timeout.signal});
+      if(!response.ok)throw new Error('HTTP '+response.status);
+      applyPacket(await response.json());
+    } catch(ex) {
+      error=ex.name==='AbortError'?'Zeitüberschreitung':String(ex.message).slice(0,100);
+      renderTrace();
+    } finally {
+      clearTimeout(deadline);
+      pending=false;
+    }
+  }
+  async function command(verb,button) {
+    if(preview)return;
+    button.disabled=true;
+    try {
+      const name='CAN Aufzeichnung '+verb;
+      const response=await fetch('/button/'+encodeURIComponent(name)+'/press',{method:'POST',credentials:'same-origin'});
+      if(!response.ok)throw new Error('HTTP '+response.status);
+      if(verb==='starten' || verb==='loeschen')resetClient();
+      error='';
+      await poll();
+    } catch(ex) {
+      error='Aktion nicht bestätigt: '+ex.message;
+      renderTrace();
+    } finally {
+      button.disabled=false;
+    }
+  }
+  for(const [id,verb] of [['trace-start','starten'],['trace-stop','stoppen'],['trace-clear','loeschen']]) {
+    el(id).addEventListener('click',()=>command(verb,el(id)));
+    if(preview)el(id).disabled=true;
+  }
+  el('trace-reference').addEventListener('click',()=>{
+    references.clear();
+    for(const frame of history) references.set(key(frame),frame.data);
+    error='';
+    el('trace-state').textContent='Referenz gesetzt: '+references.size+' eindeutige CAN-ID/Index-Kombinationen.';
+  });
+  el('trace-marker').addEventListener('click',()=>{
+    markers.push({sequence:cursor,at:new Date().toISOString()});
+    renderTrace();
+  });
+  el('trace-export').addEventListener('click',()=>{
+    const rows=visibleFrames();
+    const notes=markers.map(mark=>'# Markierung bei Sequenz '+mark.sequence+' ('+mark.at+')').join('\r\n');
+    const csv='\uFEFF'+api.traceCsv(rows)+(notes?notes+'\r\n':'');
+    const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+    const link=document.createElement('a');
+    link.href=url;
+    link.download='pyromat-can-'+new Date().toISOString().slice(0,19).replace(/:/g,'-')+'.csv';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  });
+  for(const id of ['trace-filter-id','trace-filter-index','trace-filter-delta'])
+    el(id).addEventListener('input',renderTrace);
+  el('trace-tx-preview').addEventListener('click',()=>{
+    const result=api.parseDryRunFrame(el('trace-tx-id').value,el('trace-tx-data').value);
+    el('trace-tx-result').textContent=result.error?'Ungültige Eingabe: '+result.error:
+      'Nur Simulation · NICHT gesendet\nStandard-CAN '+result.hexId+' · '+result.data.match(/.{2}/g).join(' ')+'\n'+
+      result.data.length/2+' Datenbytes · keine Steuerfreigabe vorhanden';
+  });
+  if(preview) {
+    const samples=[
+      {seq:1,ms:100,id:0x23B,ext:false,rtr:false,data:'8D007F004600CD01'},
+      {seq:2,ms:300,id:0x23B,ext:false,rtr:false,data:'8D007F004600CE01'}
+    ];
+    applyPacket({running:false,generation:1,overwritten:0,missed:0,frames:samples});
+  }
+  renderTrace();
+  const timer=setInterval(poll,700);
+  window.addEventListener('pagehide',()=>{closed=true;clearInterval(timer);},{once:true});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll();});
+})();
