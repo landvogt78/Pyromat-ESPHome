@@ -23,14 +23,14 @@ W1 sind Bytes 2–3, W2 Bytes 4–5, W3 Bytes 6–7; Bytezählung beginnt bei 0.
 | `0x001E` | W3 | Restsauerstoff | / 10 → % | bisherige Zuordnung, Dump plausibel |
 | `0x0027` | W1 | Puffer unten | / 10 → °C | bisherige Zuordnung |
 | `0x003F` | W1 / W2 / W3 | Jahr / Monat / Tag | unverändert | aus Dump abgeleitet |
-| `0x0042` | W1 / W2 / W3 | Wochentag / Minute / Sekunde | unverändert | Wochentag 1=Montag angenommen; 3 passt zum Mittwoch im Dump |
-| `0x0045` | W1 | Stunde | unverändert | Übergang 13→14 beobachtet |
+| `0x0042` | W1 / W2 / W3 | Wochentag / Minute / Sekunde | unverändert | Kesseluhr am 20.10.2026 vom Betreiber bestätigt; Wochentag-Zählung aus Dump abgeleitet |
+| `0x0045` | W1 | Stunde | unverändert | Kesseluhr am 20.10.2026 vom Betreiber bestätigt |
 | `0x0054` | W1 | Systemtemperatur | / 10 → °C | bisherige Zuordnung |
 | `0x0066` | W1 / W3 | Abgastemperatur / Lüfterdrehzahl | / 10 → °C / unverändert → rpm | bisherige Zuordnung |
-| `0x007B` | W3 | Rücklaufmischer Rohwert | unverändert | 62736 beobachtet; keine bestätigte Prozent-Skalierung |
-| `0x007E` | W2 | Pufferventil Rohwert | unverändert | 2800 beobachtet; keine bestätigte Prozent-Skalierung |
+| `0x007B` | W3 | Nicht zugeordnetes Register, Rohwert | unverändert | 62736 beobachtet; bisherige Mischer-Deutung am Projektkessel unplausibel |
+| `0x007E` | W2 | Nicht zugeordnetes Register, Rohwert | unverändert | 2800 beobachtet; bisherige Pufferventil-Deutung am Projektkessel unplausibel |
 | `0x0087` | W2 | Primärluftklappe | unverändert → % | bisherige Zuordnung; im Dump nur 0 |
-| `0x008D` | W2 | Restsauerstoff Soll **Kandidat** | / 10 → % | Rohwert 70 → 7,0 %, am Display bestätigen |
+| `0x008D` | W2 | Restsauerstoff Soll | / 10 → % | Vom Betreiber am Projektkessel am 20.10.2026 bestätigt |
 | `0x008D` | W3 | Kesselrücklauf | / 10 → °C | bisherige Zuordnung |
 | `0x0090` | W3 | Sekundärluftklappe | unverändert → % | bisherige Zuordnung; im Dump nur 0 |
 | `0x0096` | W1 / W2 | Puffer Mitte / Puffer oben | / 10 → °C | bisherige Zuordnung |
@@ -47,7 +47,7 @@ Die untersuchte private Aufzeichnung enthält 181.073 Telegramme über etwa 76 M
 
 ```
 9C 00 00 00 00 00 DE 01 → Kesseltemperatur 47,8 °C
-8D 00 7F 00 46 00 CD 01 → Soll-O₂-Kandidat 7,0 %, Rücklauf 46,1 °C
+8D 00 7F 00 46 00 CD 01 → O₂-Sollwert 7,0 %, Rücklauf 46,1 °C
 3F 00 E8 07 0A 00 1E 00 → 30.10.2024
 42 00 03 00 04 00 34 00 → Wochentag 3, Minute 4, Sekunde 52
 45 00 0D 00 00 00 00 00 → Stunde 13
@@ -60,7 +60,7 @@ Die zusätzlich untersuchten Dateien `can2.txt` und `can3.log` enthalten gefilte
 
 ## Abweichungen zu Forenbeispielen
 
-[Derbs Veröffentlichung](https://github.com/redarflap/pyromat_to_lora/blob/main/main/twai_network_example_master_main.c), verlinkt im [Forumsbeitrag](https://www.holzheizer-forum.de/forum/thread/55272-k%C3%B6b-pyromat-eco-4-visualisierung/), enthält weitere Zuordnungen und einen teils verschobenen Beginn der Dreiergruppen. Eine vermutete fortlaufende Registeradressierung motiviert den O₂-Sollwert-Kandidaten, ist aber kein allgemeiner Beweis für die Übertragbarkeit aller Felder.
+[Derbs Veröffentlichung](https://github.com/redarflap/pyromat_to_lora/blob/main/main/twai_network_example_master_main.c), verlinkt im [Forumsbeitrag](https://www.holzheizer-forum.de/forum/thread/55272-k%C3%B6b-pyromat-eco-4-visualisierung/), enthält weitere Zuordnungen und einen teils verschobenen Beginn der Dreiergruppen. Eine vermutete fortlaufende Registeradressierung hatte den O₂-Sollwert als Kandidaten nahegelegt; die Zuordnung wurde inzwischen für den Projektkessel bestätigt. Auf andere Geräte lässt sich das nicht ungeprüft übertragen.
 
 Die dort interessanten Indizes `0x0044`, `0x008C` und `0x0092` fehlen in dieser Aufzeichnung. Alternative Pufferfelder bei `0x0171` und den entsprechenden Wörtern von `0x0174` bleiben null. Sie ersetzen deshalb nicht die hier vorhandenen Pufferwerte.
 
@@ -72,4 +72,12 @@ Der Decoder akzeptiert nur acht Bytes auf den vier genannten IDs. Er prüft den 
 
 Nach 30 Sekunden ohne passende CAN-ID meldet die Firmware fehlenden CAN-Empfang. Ein einzelner numerischer Messwert wird nach 60 Sekunden ohne erneute gültige Veröffentlichung ungültig, auch wenn andere Register weiter eintreffen. Jeder Bestandteil von Kesseldatum und -zeit besitzt seine eigene 60-Sekunden-Frist. Ein weiterhin gültiger Sekundenwert kann keine ausgefallene Stunde oder Minute aktuell halten. Text- und binäre Netzwerkangaben werden dagegen bei Änderungen veröffentlicht und benötigen keinen künstlichen Änderungsrhythmus.
 
-Die Firmware interpretiert keine Statusnummer als Heizphase und sendet keine Anwendungs-Steuertelegramme. Im Standardmodus `NORMAL` bestätigt der CAN-Controller empfangene Frames auf dem Bus. Nur mit geeigneter Busumgebung auf `LISTENONLY` umstellen.
+Die Firmware interpretiert keine Statusnummer als Heizphase und sendet keine Anwendungs-Steuertelegramme. Der CAN-Detektiv protokolliert auf Anforderung weitere CAN-IDs, besitzt aber nur eine **lokale Schreibtest-Vorschau ohne tatsächliche Übertragung**. Im Standardmodus `NORMAL` bestätigt der CAN-Controller empfangene Frames auf dem Bus. Nur mit geeigneter Busumgebung auf `LISTENONLY` umstellen.
+
+## CAN-Detektiv / Testlabor (ab 2.1)
+
+Der vierte Reiter der lokalen Weboberfläche ist ein eingeschalteter Mitschnitt nur auf Knopfdruck. Standard- und Extended-CAN-Nachrichten werden in einem festen, 512 Elemente großen RAM-Ringpuffer erfasst. Der geschützte Endpunkt `GET /can/trace?after=<Sequenz>` liefert maximal 96 vollständige Frames je Abruf; er erbt die Webserver-Digest-Authentifizierung. Der Broker bekommt die Rohdaten nicht über MQTT. Bei Browserlatenz meldet die Oberfläche verpasste Sequenzen und Überläufe auf Anwendungsebene. Paketverluste innerhalb des MCP2515 sind nicht nachweisbar.
+
+Ein Schreibtest-Labor prüft höchstens acht HEX-Datenbytes und eine Standard-ID `0x000`–`0x7FF`, zeigt jedoch nur den geplanten Frame **im Browser**. Es existieren keine Schreib-HTTP-Endpunkte, CAN-Sendeaktionen, automatischen Anfragen oder sonstigen Übertragungsmöglichkeiten. Speziell bei Verbrennungs- und Sicherheitseinstellungen niemals anhand vermuteter Register experimentieren.
+
+Hinweis zur bestätigten Kesseluhr: Die *Uhrzeit* wurde vom Anlagenbetreiber bestätigt; das *Datum* bleibt in der Aufzeichnung plausibel, ohne gesondert nachgewiesene Displayübereinstimmung.
