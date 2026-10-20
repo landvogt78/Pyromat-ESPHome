@@ -12,3 +12,25 @@
 @media(max-width:760px){.sidebar{position:relative;inset:auto;width:100%;padding:16px 17px 0;display:block}.brand{margin:0 0 14px;gap:9px}.brand-mark{width:25px;height:30px}.brand-mark svg{width:24px;height:28px}.brand strong{font-size:19px}.brand small{font-size:8px}.nav-label,.sidebar-bottom{display:none}.nav{display:flex;gap:5px}.nav button{border-radius:7px 7px 0 0;padding:11px 12px;font-size:12px;gap:7px;flex:1;justify-content:center}.nav button[aria-selected=true]:after{display:none}.nav button svg{width:15px;height:15px}.layout{margin-left:0;padding:25px 17px 20px}.header{margin-bottom:20px;gap:12px}.header p{font-size:12px;max-width:280px}.header h1{font-size:28px}.header .eyebrow{font-size:9px}.header-actions{gap:7px}.header-actions .button{padding:10px}.status-strip{gap:9px;margin-bottom:18px;font-size:10px}.status-right{display:none}.metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin-bottom:18px}.metric{padding:16px}.metric-value{font-size:33px}.metric-label{font-size:12px}.bottom-grid,.value-groups{grid-template-columns:1fr;gap:17px}.panel-head{padding:18px 18px 0}.panel-head p{font-size:10px}.hydraulic-body{padding:5px 3px 0}.hydraulic-foot{padding:12px 18px;align-items:flex-start;flex-direction:column;gap:7px}.hydraulic-foot p{margin:0;text-align:left}.hydraulic{margin-bottom:17px}.rows{padding-inline:18px}.footer{flex-direction:column;align-items:flex-start;gap:5px;margin-top:20px}.toast{left:50%;width:max-content}.preview-banner~.sidebar{top:auto}.preview-banner~.layout{padding-top:25px}.clock{padding-top:16px}.bar-row{grid-template-columns:1fr 85px 45px}.row{font-size:11px}.row-value{font-size:11px}.candidate{font-size:8px;margin-left:4px}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 .hydraulic [data-value^="puffer_"]{fill:#22352f}.hydraulic svg .diagram-tank-label{fill:#46534a}
+
+
+/* CAN-Detektiv: integrated into the same locally embedded responsive dashboard. */
+.trace-panel{margin-bottom:21px;padding-bottom:19px}
+.trace-controls{display:flex;gap:9px;flex-wrap:wrap;padding:17px 22px 8px}
+.trace-controls .button{min-height:36px;font-size:11px}
+.trace-state,.trace-notices{font-size:11px;color:var(--muted);padding:5px 23px 12px;line-height:1.6}
+.trace-filters{display:flex;flex-wrap:wrap;align-items:end;gap:14px;padding:12px 23px 18px}
+.trace-filters label{display:flex;flex-direction:column;gap:5px;font-size:11px;color:var(--muted);flex:1;min-width:130px}
+.trace-filters label:has(input[type=checkbox]){flex-direction:row;align-items:center;min-width:180px;padding-bottom:10px;gap:8px}
+.trace-filters input:not([type=checkbox]){border:1px solid var(--line);border-radius:7px;padding:9px 12px;width:100%;min-height:38px;font:12px ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--ink);background:var(--surface)}
+.trace-filters input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.trace-filters input[type=checkbox]{accent-color:var(--accent)}
+.trace-scroll{overflow:auto;max-height:540px;margin:0 22px;border:1px solid var(--line);border-radius:9px}
+.trace-table{border-collapse:collapse;width:100%;font-size:11px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.trace-table th{position:sticky;top:0;z-index:1;background:var(--soft);font-size:10px;letter-spacing:.3px;text-align:left;color:var(--muted);font-weight:700}
+.trace-table th,.trace-table td{padding:10px 12px;border-bottom:1px solid var(--line)}
+.trace-table tbody tr:hover{background:var(--soft)}
+.trace-hex{font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
+.trace-delta{background:var(--warm);color:var(--accent);border-radius:3px;padding:2px;font-weight:800}
+.trace-tx-result{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--soft);border-radius:8px;border:1px solid var(--line);font:12px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;padding:15px;margin:0 23px 15px}
+@media(max-width:760px){.trace-controls,.trace-filters{padding-inline:15px;gap:7px}.trace-scroll{margin-inline:15px}.trace-state,.trace-notices{padding-inline:15px}.trace-tx-result{margin-inline:15px}.trace-filters label{min-width:110px}.trace-controls .button{flex:1 1 auto}}
