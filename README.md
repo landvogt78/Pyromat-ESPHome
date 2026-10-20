@@ -11,17 +11,19 @@
 
 *Schematische Vorschau mit Beispieldaten. Die tatsächliche Weboberfläche ergänzt Messwertkarten, alle Werte, Diagnose und einen Hell-/Dunkelmodus.*
 
-[Einrichtung](#einrichtung) · [Hardware](#hardware) · [Home Assistant & MQTT](#anbindungen) · [CAN-Zuordnungen](docs/protokoll.md) · [Mitmachen](CONTRIBUTING.md)
+[Einrichtung](#einrichtung) · [Hardware](#hardware) · [Home Assistant & MQTT](#anbindungen) · [CAN-Zuordnungen](docs/protokoll.md) · [CAN-Detektiv](#can-detektiv) · [Mitmachen](CONTRIBUTING.md)
 
 ## Was du bekommst
 
 - Eine responsive, deutschsprachige Weboberfläche mit Kessel, Pufferspeicher und Heizkreis als Hydraulikschema.
 - Kessel-, Abgas-, Rücklauf-, System-, Heizungs- und Puffertemperaturen, Restsauerstoff, Lüfterdrehzahl und Luftklappen.
 - Kesseluhr, Datum, CAN-Empfang, Telegrammzähler, Datenalter und Netzwerkdiagnose.
-- Sichtbar als solche gekennzeichnete Rohwerte und ein noch zu bestätigender Sauerstoff-Sollwert.
+- Bestätigten O₂-Sollwert und Kesseluhr; bisherige Mischer-/Pufferventil-Zuordnungen werden nur als unbestätigte Rohregister geführt.
 - Neustart des **ESP32** über die Oberfläche, mit Bestätigung. Der Heizkessel wird dadurch nicht neu gestartet.
 - Verschlüsselte native ESPHome-API und verschlüsselte ESPHome-OTA-Updates, optional zusätzlich MQTT.
 - Einen zugangsgeschützten Webserver, WLAN-Einrichtung bei Verbindungsproblemen und ein Hilfsprogramm für lokale Zugangsdaten.
+
+- Einen vierten Reiter **CAN-Detektiv** mit Live-Mitschnitt, ID-/Indexfilter, Referenzvergleich, Markierungen, CSV-Export und einem rein simulierten Schreibtest-Labor. **Die Firmware sendet keine CAN-Steuertelegramme.**
 
 Die Oberfläche und ihre Schrift-/Grafikelemente liegen im Flash. Für den Betrieb sind kein externer Webserver, keine Cloud und keine nachgeladenen Schriftarten oder JavaScript-Bibliotheken nötig. Das Hydraulikbild ist eine vereinfachte Darstellung, kein individueller Anlagenplan. Eine Pumpenaktivität oder ein Pufferfüllstand wird daraus nicht erfunden.
 
@@ -121,6 +123,14 @@ substitutions:
 
 Weitere Vorgaben stehen am Anfang von [`packages/bridge.yaml`](packages/bridge.yaml). Die Quarzfrequenz muss zur Hardware passen. Standard ist `can_mode: NORMAL`: Die Anwendung sendet keine Steuertelegramme, der CAN-Controller bestätigt empfangene gültige Frames jedoch auf Hardwareebene. `LISTENONLY` ist möglich, wenn andere Teilnehmer die notwendigen CAN-Bestätigungen übernehmen.
 
+## CAN-Detektiv
+
+Unter `http://pyromat.local` den vierten Reiter öffnen. **Aufzeichnen** startet eine neue, auf 512 Telegramme begrenzte Ringpuffer-Sitzung im ESP32 (standardmäßig AUS). **Stoppen** friert sie ein. **Referenz setzen** merkt sich den jeweils jüngsten Payload pro CAN-ID und vollständigem 16-Bit-Index; später geänderte Bytes werden markiert. Filter, Markierung und CSV-Export geschehen lokal im Browser. Nur die 150 neuesten gefilterten Telegramme erscheinen gleichzeitig in der Tabelle, bis zu 3000 bleiben für den Export im Browser-RAM. Nach Schließen der Seite sind Browserdaten weg.
+
+Der GET-Endpunkt `/can/trace?after=<Sequenz>` liefert authentifizierte, begrenzte JSON-Ausschnitte. Er wird nur bei geöffnetem Tab abgefragt. Überlauf- und Sequenzlücken werden separat angezeigt. **Es findet keine CAN-Übertragung statt:** Das Schreibtest-Labor prüft HEX-Werte und zeigt den Frame ausschließlich als Vorschau. Weder REST noch MQTT oder ioBroker können daraus einen realen Schreibzugriff auslösen. Der bestehende CAN-Controller quittiert im Modus NORMAL weiterhin empfangene Frames auf der Hardwareebene (ACK).
+
+Bei einer Kesselbedienung zunächst im Ruhezustand eine Aufzeichnung starten, **Referenz setzen**, eine ungefährliche Änderung am Originalbedienteil vornehmen und die Unterschiede untersuchen. Eventuell entstehen keine CAN-Änderungen, wenn eine Bedienung intern erfolgt. Hardwareseitig verpasste Frames kann die Firmware nicht zuverlässig erkennen. Die bestätigte O₂-Sollwert-Zuordnung ist projektspezifisch; Ventilregister sind offen (Details unter [Protokoll](docs/protokoll.md)).
+
 ## Anbindungen
 
 **Home Assistant:** ESPHome-Integration hinzufügen, `pyromat.local` bzw. die IP-Adresse und den Schlüssel aus `api_encryption_key` verwenden. Der API-Port ist standardmäßig `6053`. Sensoren und Neustarttaste werden von ESPHome bereitgestellt.
@@ -165,3 +175,8 @@ Unter Windows kann ein anderer C++17-Compiler verwendet werden. Die [GitHub-Prü
 Das Projekt baut auf dem Austausch im [Holzheizer-Forum: Köb Pyromat Eco 4 – Visualisierung](https://www.holzheizer-forum.de/forum/thread/55272-k%C3%B6b-pyromat-eco-4-visualisierung/) auf. Ergänzende Hinweise stammen unter anderem aus [Derbs CAN-Auswertung](https://github.com/redarflap/pyromat_to_lora/blob/main/main/twai_network_example_master_main.c). Abweichende Register seiner Regelung werden als Vergleich betrachtet und nicht ungeprüft übernommen.
 
 Ein Community-Projekt, keine offizielle Software von Köb oder Viessmann. Neue belegte Zuordnungen und Rückmeldungen zu anderen Regelungsversionen sind willkommen; siehe [CONTRIBUTING.md](CONTRIBUTING.md).
+
+
+### Änderung der Entity-Namen in Version 2.1
+
+Der interne ESPHome-ID `soll_restsauerstoff` bleibt unverändert, sein sichtbarer Name ist jetzt **Restsauerstoff Soll** (bestätigt). Die alten Diagnosenamen „Ventil Ruecklaufmischer Rohwert“ und „Ventil Puffer Rohwert“ heißen jetzt **Register 0x007B W3 Rohwert** und **Register 0x007E W2 Rohwert**; interne YAML-IDs bleiben gleich. MQTT-Topics, automatisch erstellte Entitäten oder ioBroker-Aliase mit den alten Namen müssen bei Bedarf angepasst werden.
