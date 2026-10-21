@@ -34,3 +34,11 @@
 .trace-delta{background:var(--warm);color:var(--accent);border-radius:3px;padding:2px;font-weight:800}
 .trace-tx-result{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--soft);border-radius:8px;border:1px solid var(--line);font:12px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;padding:15px;margin:0 23px 15px}
 @media(max-width:760px){.trace-controls,.trace-filters{padding-inline:15px;gap:7px}.trace-scroll{margin-inline:15px}.trace-state,.trace-notices{padding-inline:15px}.trace-tx-result{margin-inline:15px}.trace-filters label{min-width:110px}.trace-controls .button{flex:1 1 auto}}
+
+.trace-memory{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:6px 23px 12px;font-size:12px;color:var(--ink)}
+.trace-memory>div{display:grid;gap:7px}
+.trace-memory progress{width:100%;height:11px;accent-color:var(--green)}
+.trace-memory-warning{margin:0 23px 12px;padding:10px 12px;border:1px solid var(--line);border-radius:7px;background:var(--warm);color:var(--accent);font-size:12px;font-weight:600}
+.trace-memory-warning[hidden]{display:none}
+.trace-memory-warning.critical,.trace-memory-warning.overflow{border-color:var(--danger);color:var(--danger)}
+@media(max-width:760px){.trace-memory{grid-template-columns:1fr;padding-inline:15px}.trace-memory-warning{margin-inline:15px}}
