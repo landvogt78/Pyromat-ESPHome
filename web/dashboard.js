@@ -89,7 +89,7 @@
   function traceStorageState({espBuffered=0,espCapacity=2048,browserUsed=0,browserCapacity=30000,browserPruned=0}={}) {
     const fraction=(used,cap)=>cap>0?Math.max(0,Math.min(100,Math.round(100*used/cap))):0;
     const espPercent=fraction(espBuffered,espCapacity), browserPercent=fraction(browserUsed,browserCapacity);
-    const level=browserPruned>0?'overflow':browserPercent>=95?'critical':browserPercent>=80?'warning':'normal';
+    const level=browserPruned>0?'overflow':browserUsed>=browserCapacity*0.95?'critical':browserUsed>=browserCapacity*0.8?'warning':'normal';
     const message=level==='overflow'?`${browserPruned} ältere Browser-Telegramme verworfen. Jetzt CSV exportieren, um die verbleibenden Daten zu sichern.`:
       level==='critical'?'Browser-Speicher nahezu voll: jetzt CSV exportieren, bevor ältere Telegramme verworfen werden.':
       level==='warning'?'Browser-Speicher über 80 % belegt: bitte rechtzeitig CSV exportieren.':'';
