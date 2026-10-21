@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const {parseTraceFrame, parseDryRunFrame, changedBytes, traceCsv} = require('../web/dashboard.js');
+const {parseTraceFrame, parseDryRunFrame, changedBytes, traceCsv, traceStorageState} = require('../web/dashboard.js');
 
 test('valid raw CAN frame decodes 16-bit little-endian index only for our known IDs', () => {
   const frame=parseTraceFrame({seq:1,ms:10,id:0x23B,ext:false,rtr:false,data:'8D00007F4600CD01'});
@@ -34,4 +34,33 @@ test('CSV uses only validated numeric frame data and complete header', () => {
   const csv=traceCsv([row]);
   assert.match(csv,/Zeit_ms;Sequenz;CAN_ID;Format;RTR;Index;Daten_HEX/);
   assert.match(csv,/200;10;0x23B;Standard;Nein;0x008D;8D007F004600CD01/);
+});
+
+
+test('trace memory display distinguishes rolling ESP ring and browser capacity', () => {
+  const storage=traceStorageState({espBuffered:1024,espCapacity:2048,browserUsed:15000,browserCapacity:30000,browserPruned:0});
+  assert.equal(storage.espPercent,50);
+  assert.equal(storage.browserPercent,50);
+  assert.equal(storage.level,'normal');
+  assert.equal(storage.message,'');
+});
+
+test('browser warns at 80% and urgently at 95%, before any frame is discarded', () => {
+  const base={espBuffered:2048,espCapacity:2048,browserCapacity:30000,browserPruned:0};
+  assert.equal(traceStorageState({...base,browserUsed:23999}).level,'normal');
+  const warning=traceStorageState({...base,browserUsed:24000});
+  assert.equal(warning.level,'warning');
+  assert.match(warning.message,/CSV/);
+  assert.equal(traceStorageState({...base,browserUsed:28499}).level,'warning');
+  const urgent=traceStorageState({...base,browserUsed:28500});
+  assert.equal(urgent.level,'critical');
+  assert.match(urgent.message,/CSV/);
+});
+
+test('browser overflow warning survives rollover and counters stay bounded', () => {
+  const state=traceStorageState({espBuffered:2050,espCapacity:2048,browserUsed:30010,browserCapacity:30000,browserPruned:15});
+  assert.equal(state.espPercent,100);
+  assert.equal(state.browserPercent,100);
+  assert.equal(state.level,'overflow');
+  assert.match(state.message,/15/);
 });
