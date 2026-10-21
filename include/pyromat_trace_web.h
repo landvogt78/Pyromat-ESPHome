@@ -41,7 +41,7 @@ class CanTraceHandler final : public AsyncWebHandler {
     body.reserve(150 + state.frames.size() * 100);
     char row[150];
     std::snprintf(row, sizeof(row),
-                  "{\"running\":%s,\"generation\":%lu,\"last_sequence\":%lu,\"overwritten\":%lu,\"missed\":%lu,\"frames\":[",
+                  "{\"running\":%s,\"generation\":%lu,\"last_sequence\":%lu,\"overwritten\":%lu,\"missed\":%lu,\"buffered\":%lu,\"capacity\":%lu,\"frames\":[",
                   state.running ? "true" : "false", static_cast<unsigned long>(state.generation),
                   static_cast<unsigned long>(state.last_sequence), static_cast<unsigned long>(state.overwritten),
                   static_cast<unsigned long>(state.missed), static_cast<unsigned long>(state.buffered),
