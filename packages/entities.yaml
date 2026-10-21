@@ -112,12 +112,11 @@ sensor:
 
   - platform: template
     id: soll_restsauerstoff
-    name: "Restsauerstoff Soll Kandidat"
+    name: "Restsauerstoff Soll"
     update_interval: never
     accuracy_decimals: 1
     unit_of_measurement: "%"
     state_class: measurement
-    entity_category: diagnostic
     filters:
       - timeout: 60s
 
@@ -153,7 +152,7 @@ sensor:
 
   - platform: template
     id: ventil_ruecklaufmischer
-    name: "Ventil Ruecklaufmischer Rohwert"
+    name: "Register 0x007B W3 Rohwert"
     update_interval: never
     accuracy_decimals: 0
     entity_category: diagnostic
@@ -162,7 +161,7 @@ sensor:
 
   - platform: template
     id: ventil_puffer
-    name: "Ventil Puffer Rohwert"
+    name: "Register 0x007E W2 Rohwert"
     update_interval: never
     accuracy_decimals: 0
     entity_category: diagnostic

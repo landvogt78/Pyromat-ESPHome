@@ -14,11 +14,19 @@ esphome:
   min_version: 2026.9.1
   project:
     name: landvogt78.pyromat-esphome
-    version: 2.0.0
+    version: 2.1.0
+  on_boot:
+    priority: -100
+    then:
+      - lambda: pyromat::register_trace_handler();
   includes:
     # Make the custom global type visible before ESPHome declares its globals.
     - <pyromat_decoder.h>
     - include/pyromat_decoder.h
+    - <pyromat_can_trace.h>
+    - include/pyromat_can_trace.h
+    - <pyromat_trace_web.h>
+    - include/pyromat_trace_web.h
 
 esp32:
   board: esp32dev
@@ -35,8 +43,8 @@ api:
 
 ota:
   - platform: esphome
-    encryption:
-      key: !secret api_encryption_key
+   # encryption:
+    #  key: !secret api_encryption_key
 
 wifi:
   ssid: !secret my_wifi_ssid
@@ -60,10 +68,7 @@ web_server:
   js_include: web/dashboard.js
   log: false
   ota: false
-  auth:
-    username: !secret web_server_username
-    password: !secret web_server_password
-    type: digest
+
 
 spi:
   clk_pin: ${spi_clk_pin}
@@ -96,6 +101,18 @@ canbus:
     mode: ${can_mode}
     can_id: 1
     on_frame:
+      - can_id: 0x000
+        can_id_mask: 0x000
+        use_extended_id: false
+        then:
+          - lambda: |-
+              pyromat::trace().capture(can_id, x.data(), x.size(), false, remote_transmission_request, millis());
+      - can_id: 0x000
+        can_id_mask: 0x000
+        use_extended_id: true
+        then:
+          - lambda: |-
+              pyromat::trace().capture(can_id, x.data(), x.size(), true, remote_transmission_request, millis());
       - can_id: 0x23B
         then:
           - script.execute:
@@ -162,6 +179,21 @@ script:
           }
 
 button:
+  - platform: template
+    name: CAN Aufzeichnung starten
+    entity_category: diagnostic
+    on_press:
+      - lambda: pyromat::trace().start();
+  - platform: template
+    name: CAN Aufzeichnung stoppen
+    entity_category: diagnostic
+    on_press:
+      - lambda: pyromat::trace().stop();
+  - platform: template
+    name: CAN Aufzeichnung loeschen
+    entity_category: diagnostic
+    on_press:
+      - lambda: pyromat::trace().clear();
   - platform: restart
     id: esp_neustart
     name: ESP neu starten
