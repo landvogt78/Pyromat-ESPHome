@@ -36,13 +36,15 @@ struct TraceSnapshot {
   uint32_t last_sequence{0};
   uint32_t overwritten{0};
   uint32_t missed{0};
+  size_t buffered{0};
+  size_t capacity{0};
   std::vector<TraceFrame> frames{};
 };
 
 // Fixed-size RAM capture; read-only CAN traffic, no CAN transmit method.
 class CanTrace {
  public:
-  static constexpr size_t CAPACITY = 512;
+  static constexpr size_t CAPACITY = 2048;
   void start() {
     TraceLock lock(mutex_);
     reset_();
@@ -85,6 +87,8 @@ class CanTrace {
     out.generation = generation_;
     out.last_sequence = last_sequence_;
     out.overwritten = overwritten_;
+    out.buffered = size_;
+    out.capacity = CAPACITY;
     if (size_ == 0 || limit == 0) return out;
     const uint32_t first_sequence = frames_[head_].sequence;
     const uint32_t minimum_after = first_sequence - 1;
