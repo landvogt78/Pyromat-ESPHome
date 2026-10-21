@@ -86,8 +86,17 @@
     });
     return lines.join('\r\n')+'\r\n';
   }
+  function traceStorageState({espBuffered=0,espCapacity=2048,browserUsed=0,browserCapacity=30000,browserPruned=0}={}) {
+    const fraction=(used,cap)=>cap>0?Math.max(0,Math.min(100,Math.round(100*used/cap))):0;
+    const espPercent=fraction(espBuffered,espCapacity), browserPercent=fraction(browserUsed,browserCapacity);
+    const level=browserPruned>0?'overflow':browserPercent>=95?'critical':browserPercent>=80?'warning':'normal';
+    const message=level==='overflow'?`${browserPruned} ältere Browser-Telegramme verworfen. Jetzt CSV exportieren, um die verbleibenden Daten zu sichern.`:
+      level==='critical'?'Browser-Speicher nahezu voll: jetzt CSV exportieren, bevor ältere Telegramme verworfen werden.':
+      level==='warning'?'Browser-Speicher über 80 % belegt: bitte rechtzeitig CSV exportieren.':'';
+    return {espPercent,browserPercent,level,message};
+  }
   const api = {entityKey, numeric, reading, format, eventReading, bindPageLifecycle, restartRequest,
-    formatCanHex,parseTraceFrame,parseDryRunFrame,changedBytes,traceCsv};
+    formatCanHex,parseTraceFrame,parseDryRunFrame,changedBytes,traceCsv,traceStorageState};
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof window !== 'undefined') window.PyromatDashboard = api;
 })();
@@ -172,7 +181,7 @@
     <div class="view" role="tabpanel" aria-labelledby="tab-can" id="view-can" hidden>
       <div class="section-title"><h2>CAN-Detektiv</h2><p>Telegramme lokal untersuchen und für die Protokollanalyse exportieren. Der ESP32 sendet keine CAN-Steuerbefehle.</p></div>
       <section class="panel trace-panel">
-        <div class="panel-head"><div><h2>Live-Mitschnitt</h2><p>125 kbit/s · Standard- und Extended-Frames · 512 Einträge im ESP32-Ringpuffer</p></div><span class="badge" id="trace-running">Aus</span></div>
+        <div class="panel-head"><div><h2>Live-Mitschnitt</h2><p>125 kbit/s · Standard- und Extended-Frames · 2.048 Einträge im ESP32-Ringpuffer</p></div><span class="badge" id="trace-running">Aus</span></div>
         <div class="trace-controls">
           <button class="button primary" id="trace-start" type="button">Aufzeichnen</button>
           <button class="button" id="trace-stop" type="button">Stoppen</button>
@@ -181,6 +190,8 @@
           <button class="button" id="trace-marker" type="button">Markierung</button>
           <button class="button" id="trace-export" type="button">CSV exportieren</button>
         </div>
+        <div class="trace-memory" aria-label="Speicherbelegung"><div><span id="trace-esp-usage">ESP32: 0 / 2.048 (0 %)</span><progress id="trace-esp-bar" value="0" max="2048"></progress></div><div><span id="trace-browser-usage">Browser: 0 / 30.000 (0 %)</span><progress id="trace-browser-bar" value="0" max="30000"></progress></div></div>
+        <p id="trace-memory-warning" class="trace-memory-warning" role="status" hidden></p>
         <p id="trace-state" class="trace-state" role="status">Noch keine Daten. Aufzeichnung ist nach jedem ESP-Neustart ausgeschaltet.</p>
         <div class="trace-filters">
           <label>CAN-ID (Hex)<input id="trace-filter-id" placeholder="z. B. 0x23B" autocomplete="off"></label>
@@ -351,7 +362,8 @@
   const history=[], markers=[];
   const references=new Map();
   let generation=null,cursor=0,recording=false,overwritten=0,missed=0,localPruned=0,pending=false,closed=false,error='';
-  const maxHistory=3000;
+  let espBuffered=0,espCapacity=2048;
+  const maxHistory=30000;
   const key=frame=>api.formatCanHex(frame.id,frame.ext)+'/'+(frame.index===null?'-':api.formatCanHex(frame.index,false,true));
   const hexFilter=(text,max)=>{
     const input=text.trim().replace(/^0x/i,'');
@@ -370,6 +382,17 @@
   function renderTrace() {
     el('trace-running').textContent=recording?'Aufzeichnung aktiv':'Aus / angehalten';
     el('trace-running').className='badge '+(recording?'good':'warn');
+    const storage=api.traceStorageState({espBuffered,espCapacity,browserUsed:history.length,browserCapacity:maxHistory,browserPruned:localPruned});
+    el('trace-esp-usage').textContent=`ESP32: ${espBuffered.toLocaleString('de-DE')} / ${espCapacity.toLocaleString('de-DE')} (${storage.espPercent} %)`;
+    el('trace-browser-usage').textContent=`Browser: ${history.length.toLocaleString('de-DE')} / ${maxHistory.toLocaleString('de-DE')} (${storage.browserPercent} %)`;
+    el('trace-esp-bar').max=espCapacity;
+    el('trace-esp-bar').value=espBuffered;
+    el('trace-browser-bar').max=maxHistory;
+    el('trace-browser-bar').value=history.length;
+    const warning=el('trace-memory-warning');
+    warning.hidden=!storage.message;
+    warning.textContent=storage.message;
+    warning.className='trace-memory-warning '+storage.level;
     const data=visibleFrames();
     const latest=data.slice(-150).reverse();
     el('trace-rows').innerHTML=latest.map(frame=>{
@@ -393,6 +416,8 @@
     missed=0;
     overwritten=0;
     localPruned=0;
+    espBuffered=0;
+    espCapacity=2048;
   }
   function applyPacket(packet) {
     if (!packet || typeof packet.running!=='boolean' || !Number.isSafeInteger(packet.generation) ||
@@ -405,6 +430,8 @@
     recording=packet.running;
     overwritten=packet.overwritten;
     missed+=packet.missed;
+    espBuffered=Number.isSafeInteger(packet.buffered)&&packet.buffered>=0?packet.buffered:espBuffered;
+    espCapacity=Number.isSafeInteger(packet.capacity)&&packet.capacity>0?packet.capacity:espCapacity;
     for(const raw of packet.frames) {
       const frame=api.parseTraceFrame(raw);
       if(!frame || frame.seq<=cursor)continue;
