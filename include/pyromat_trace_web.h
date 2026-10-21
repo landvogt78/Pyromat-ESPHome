@@ -44,7 +44,8 @@ class CanTraceHandler final : public AsyncWebHandler {
                   "{\"running\":%s,\"generation\":%lu,\"last_sequence\":%lu,\"overwritten\":%lu,\"missed\":%lu,\"frames\":[",
                   state.running ? "true" : "false", static_cast<unsigned long>(state.generation),
                   static_cast<unsigned long>(state.last_sequence), static_cast<unsigned long>(state.overwritten),
-                  static_cast<unsigned long>(state.missed));
+                  static_cast<unsigned long>(state.missed), static_cast<unsigned long>(state.buffered),
+                  static_cast<unsigned long>(state.capacity));
     body += row;
     for (size_t i = 0; i < state.frames.size(); ++i) {
       const auto &frame = state.frames[i];
