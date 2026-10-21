@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const {parseTraceFrame, parseDryRunFrame, changedBytes, traceCsv, traceStorageState} = require('../web/dashboard.js');
+const {parseTraceFrame, changedBytes, traceCsv, traceStorageState, traceEntries} = require('../web/dashboard.js');
 
 test('valid raw CAN frame decodes 16-bit little-endian index only for our known IDs', () => {
   const frame=parseTraceFrame({seq:1,ms:10,id:0x23B,ext:false,rtr:false,data:'8D00007F4600CD01'});
@@ -14,19 +14,72 @@ test('valid raw CAN frame decodes 16-bit little-endian index only for our known 
   assert.equal(parseTraceFrame({...frame,data:'GG'}),null);
 });
 
-test('write preview only validates a bounded standard frame, never transmits', () => {
-  assert.deepEqual(parseDryRunFrame('0x23B','8D 00 7F 00 46 00 CD 01'), {id:0x23B, hexId:'0x23B',data:'8D007F004600CD01'});
-  assert.equal(parseDryRunFrame('0x800','00').error,'CAN-ID muss zwischen 0x000 und 0x7FF liegen.');
-  assert.ok(parseDryRunFrame('0x23B','11 22 33 44 55 66 77 88 99').error);
-  assert.ok(parseDryRunFrame('0x23B','XY').error);
-  assert.ok(parseDryRunFrame('0x23B','123').error);
-  assert.ok(parseDryRunFrame('','00').error);
-});
-
 test('changed bytes indicates only differing octets', () => {
   assert.deepEqual(changedBytes('AABBCC','AABBDD'),[2]);
   assert.deepEqual(changedBytes(null,'AABB'),[]);
   assert.deepEqual(changedBytes('AA','AABB'),[1]);
+});
+
+test('markers divide newest-first frames after their recorded sequence, including filtered gaps', () => {
+  const frames=[{seq:10},{seq:20},{seq:30}];
+  const markers=[{number:1,sequence:15},{number:2,sequence:20},{number:3,sequence:20}];
+  assert.deepEqual(traceEntries(frames,markers),[
+    {type:'frame',frame:frames[2]},
+    {type:'marker',marker:markers[2]},
+    {type:'marker',marker:markers[1]},
+    {type:'frame',frame:frames[1]},
+    {type:'marker',marker:markers[0]},
+    {type:'frame',frame:frames[0]}
+  ]);
+});
+
+test('frame limit keeps marker boundaries inside the visible window without using frame slots', () => {
+  const frames=[{seq:1},{seq:2},{seq:3},{seq:4}];
+  const markers=[{number:1,sequence:1},{number:2,sequence:3},{number:3,sequence:4}];
+  assert.deepEqual(traceEntries(frames,markers,2),[
+    {type:'marker',marker:markers[2]},
+    {type:'frame',frame:frames[3]},
+    {type:'marker',marker:markers[1]},
+    {type:'frame',frame:frames[2]}
+  ]);
+  assert.deepEqual(frames,[{seq:1},{seq:2},{seq:3},{seq:4}]);
+  assert.deepEqual(markers,[{number:1,sequence:1},{number:2,sequence:3},{number:3,sequence:4}]);
+});
+
+test('markers remain visible without matching frames and before the first received frame', () => {
+  const marker={number:1,sequence:0};
+  assert.deepEqual(traceEntries([], [marker]), [{type:'marker',marker}]);
+  assert.deepEqual(traceEntries([{seq:1}], [marker]), [
+    {type:'frame',frame:{seq:1}}, {type:'marker',marker}
+  ]);
+  assert.deepEqual(traceEntries([], []), []);
+});
+
+test('initial trace response preserves a marker set before polling completes', async () => {
+  const nodes=new Map();
+  const el=id=>{
+    if(!nodes.has(id))nodes.set(id,{
+      hidden:false,value:'',checked:false,listeners:{},
+      addEventListener(event,handler){this.listeners[event]=handler;}
+    });
+    return nodes.get(id);
+  };
+  let poll;
+  const context={
+    window:{PyromatDashboard:require('../web/dashboard.js'),addEventListener(){}},
+    document:{hidden:false,documentElement:{dataset:{}},getElementById:el,addEventListener(){}},
+    setInterval(handler){poll=handler;return 1;},clearInterval(){},
+    setTimeout(){return 1;},clearTimeout(){},AbortController,
+    fetch:async()=>({ok:true,json:async()=>({
+      running:false,generation:0,overwritten:0,missed:0,frames:[]
+    })})
+  };
+  const source=require('node:fs').readFileSync(require.resolve('../web/dashboard.js'),'utf8');
+  require('node:vm').runInNewContext(source.slice(source.indexOf('/* CAN trace UI:')),context);
+  el('trace-marker').listeners.click();
+  assert.match(el('trace-rows').innerHTML,/<strong>Markierung 1<\/strong>/);
+  await poll();
+  assert.match(el('trace-rows').innerHTML,/<strong>Markierung 1<\/strong>/);
 });
 
 test('CSV uses only validated numeric frame data and complete header', () => {
@@ -34,6 +87,13 @@ test('CSV uses only validated numeric frame data and complete header', () => {
   const csv=traceCsv([row]);
   assert.match(csv,/Zeit_ms;Sequenz;CAN_ID;Format;RTR;Index;Daten_HEX/);
   assert.match(csv,/200;10;0x23B;Standard;Nein;0x008D;8D007F004600CD01/);
+});
+
+test('CSV preserves numbered markers as UTC comments even with no matching frames', () => {
+  const markers=[{number:1,sequence:12,at:'2026-10-21T07:08:02.676Z'}];
+  assert.equal(traceCsv([],markers),
+    'Zeit_ms;Sequenz;CAN_ID;Format;RTR;Index;Daten_HEX\r\n'+
+    '# Markierung 1 bei Sequenz 12 (2026-10-21T07:08:02.676Z)\r\n');
 });
 
 

@@ -1,43 +1,45 @@
 # Pyromat ESPHome
 
-**Dein Heizraum im Browser.** Ein lokaler Anlagenmonitor für den Köb Pyromat Eco mit Ecotronic-Regelung: ESP32 und MCP2515 empfangen die CAN-Telegramme, ESPHome stellt die Werte im Web, über seine native API und optional per MQTT bereit.
+Lokaler Anlagenmonitor für den **Köb Pyromat Eco mit Ecotronic-Regelung**. Ein ESP32 mit MCP2515 empfängt CAN-Telegramme und stellt die ausgewerteten Werte im Browser, über die native ESPHome-API und optional per MQTT bereit.
 
-[![Prüfung](https://github.com/landvogt78/Pyromat-ESPHome/actions/workflows/validate.yml/badge.svg)](https://github.com/landvogt78/Pyromat-ESPHome/actions/workflows/validate.yml)
-![ESPHome 2026.9.1](https://img.shields.io/badge/ESPHome-2026.9.1-244c3a)
-![ESP32 + MCP2515](https://img.shields.io/badge/Hardware-ESP32%20%2B%20MCP2515-99704d)
-![CAN 125 kbit/s](https://img.shields.io/badge/CAN-125%20kbit%2Fs-547c91)
+[![Firmware und Tests](https://github.com/landvogt78/Pyromat-ESPHome/actions/workflows/validate.yml/badge.svg)](https://github.com/landvogt78/Pyromat-ESPHome/actions/workflows/validate.yml)
 
-![Hydraulikschema mit ausdrücklich beispielhaften Temperaturen](docs/hydraulik-vorschau.svg)
+![Hydraulikschema mit beispielhaften Temperaturen](docs/hydraulik-vorschau.svg)
 
-*Schematische Vorschau mit Beispieldaten. Die tatsächliche Weboberfläche ergänzt Messwertkarten, alle Werte, Diagnose und einen Hell-/Dunkelmodus.*
+*Schematische Vorschau mit Beispieldaten, kein individueller Anlagenplan.*
 
-[Einrichtung](#einrichtung) · [Hardware](#hardware) · [Home Assistant & MQTT](#anbindungen) · [CAN-Zuordnungen](docs/protokoll.md) · [CAN-Detektiv](#can-detektiv) · [Mitmachen](CONTRIBUTING.md)
+[Einrichtung](#einrichtung) · [Hardware](#hardware) · [CAN-Detektiv](#can-detektiv) · [Anbindungen](#anbindungen) · [CAN-Protokoll](docs/protokoll.md) · [Entwicklung](#vorschau-und-entwicklung)
 
-## Was du bekommst
+## Oberfläche und Funktionsumfang
 
-- Eine responsive, deutschsprachige Weboberfläche mit Kessel, Pufferspeicher und Heizkreis als Hydraulikschema.
-- Kessel-, Abgas-, Rücklauf-, System-, Heizungs- und Puffertemperaturen, Restsauerstoff, Lüfterdrehzahl und Luftklappen.
-- Kesseluhr, Datum, CAN-Empfang, Telegrammzähler, Datenalter und Netzwerkdiagnose.
-- Bestätigten O₂-Sollwert und Kesseluhr; bisherige Mischer-/Pufferventil-Zuordnungen werden nur als unbestätigte Rohregister geführt.
-- Neustart des **ESP32** über die Oberfläche, mit Bestätigung. Der Heizkessel wird dadurch nicht neu gestartet.
-- Verschlüsselte native ESPHome-API und verschlüsselte ESPHome-OTA-Updates, optional zusätzlich MQTT.
-- Einen zugangsgeschützten Webserver, WLAN-Einrichtung bei Verbindungsproblemen und ein Hilfsprogramm für lokale Zugangsdaten.
+Die deutschsprachige Oberfläche liegt einschließlich Grafik und Gestaltung im ESP32-Flash. Sie benötigt keine Cloud und lädt keine externen Schriften oder JavaScript-Bibliotheken nach. Hell- und Dunkelmodus sind verfügbar.
 
-- Einen vierten Reiter **CAN-Detektiv** mit Live-Mitschnitt, ID-/Indexfilter, Referenzvergleich, Markierungen, CSV-Export und einem rein simulierten Schreibtest-Labor. **Die Firmware sendet keine CAN-Steuertelegramme.**
+| Ansicht | Inhalt |
+| --- | --- |
+| **Übersicht** | Hydraulikschema, Kessel- und Abgastemperatur, Restsauerstoff, Lüfter, Luftklappen, Sollwerte und Kesseluhr |
+| **Alle Werte** | Temperaturen von Kessel, Rücklauf, System, Heizkreis und Pufferspeicher sowie Verbrennungswerte und Kesseldatum/-zeit |
+| **Diagnose** | CAN-Empfang, Datenalter, Telegrammzähler, WLAN-Verbindung, Signalstärke, ESP32-Betriebszeit, IP-Adresse und WLAN-Name |
+| **CAN-Detektiv** | Live-Mitschnitt, Hex-Filter, Referenzvergleich, farbige Markierungen, Speicheranzeigen, CSV-Export und Kurzanleitung |
 
-Die Oberfläche und ihre Schrift-/Grafikelemente liegen im Flash. Für den Betrieb sind kein externer Webserver, keine Cloud und keine nachgeladenen Schriftarten oder JavaScript-Bibliotheken nötig. Das Hydraulikbild ist eine vereinfachte Darstellung, kein individueller Anlagenplan. Eine Pumpenaktivität oder ein Pufferfüllstand wird daraus nicht erfunden.
+Ungeklärte Register und der nicht interpretierte Betriebsstatus erscheinen nicht in der Diagnoseansicht. Die vorhandenen Rohwertsensoren stehen weiterhin über ESPHome-API/MQTT zur Verfügung; ihre offenen Bedeutungen dokumentiert das [CAN-Protokoll](docs/protokoll.md).
+
+Die Neustarttaste startet nach Bestätigung den **ESP32**, nicht den Heizkessel. Der CAN-Detektiv dient ausschließlich der Aufzeichnung. Es gibt keine Bedienoberfläche zum Zusammenstellen oder Senden von CAN-Schreibbefehlen.
+
+Fehlende Messwerte erscheinen als `—`. Nach 30 Sekunden ohne passende CAN-Telegramme meldet die Anwendung fehlenden Empfang. Einzelne Messwerte werden nach 60 Sekunden ohne gültige Aktualisierung ungültig. Ein unterbrochener Browser-Datenstrom wird ebenfalls angezeigt. Die Kesseluhr zeigt die empfangene Regelungszeit und wird vom ESP32 nicht gestellt.
 
 ## Kompatibilität
 
-Die Konfiguration entstand für einen **Köb Pyromat Eco mit Ecotronic** und verwendet MCP2515 bei 125 kbit/s. Die Zuordnungen wurden mit einer Aufzeichnung des Projektkessels vom 30.10.2024 abgeglichen. Die Regelungsversion ist dabei nicht dokumentiert; eine Übereinstimmung bei jedem Ecotronic-Stand kann deshalb nicht zugesagt werden.
+Vorgesehen sind **ESP32 DevKit (`esp32dev`), MCP2515 und 125 kbit/s**. Die bekannten Messwertzuordnungen wurden mit Aufzeichnungen des Projektkessels abgeglichen. O₂-Sollwert und Kesseluhr wurden zusätzlich am Projektkessel bestätigt. Die Ecotronic-Regelungsversion ist nicht dokumentiert; Zuordnungen sind deshalb nicht pauschal auf andere Geräte übertragbar.
 
-Ausgewertet werden die IDs `0x23B`, `0x33B`, `0x43B` und `0x53B`. Entscheidend ist zusätzlich der vollständige 16-Bit-Index im Telegramm. **Für den Vitoligno 300-C ist die Zuordnung noch nicht bestätigt.** Gleiche CAN-IDs bedeuten keine identische Registerbelegung. Andere aus dem Forum bekannte Varianten, etwa `0x381`, werden nicht automatisch gleichgesetzt. Details und offene Felder stehen in der [Protokolldokumentation](docs/protokoll.md).
+Der Messwertdecoder verarbeitet acht Datenbytes auf `0x23B`, `0x33B`, `0x43B` und `0x53B`. Ihr Aufbau ist `[Index LE16][W1 LE16][W2 LE16][W3 LE16]`. Entscheidend ist der vollständige 16-Bit-Index: `0x009C` und `0x039C` sind verschiedene Indizes. Der CAN-Detektiv erfasst zusätzlich andere Standard- und Extended-IDs als Rohdaten.
+
+Für den **Vitoligno 300-C** und andere Regelungsvarianten sind diese Messwertzuordnungen nicht bestätigt. Details, belegte Felder und offene Fragen stehen in [docs/protokoll.md](docs/protokoll.md).
 
 ## Einrichtung
 
-### 1. Projekt und ESPHome installieren
+### 1. Repository und Werkzeuge
 
-Das vollständige Repository wird benötigt, einschließlich `packages/`, `include/` und `web/`. Python 3.12 oder neuer und ESPHome **2026.9.1** verwenden; diese Version ist in `requirements.txt` festgelegt. Eine virtuelle Python-Umgebung ist empfehlenswert.
+Das vollständige Repository einschließlich `packages/`, `include/` und `web/` verwenden. Benötigt werden Python 3.12+ und die in `requirements.txt` festgelegte ESPHome-Version **2026.9.1**. Eine virtuelle Python-Umgebung ist empfehlenswert.
 
 ```sh
 git clone https://github.com/landvogt78/Pyromat-ESPHome.git
@@ -46,33 +48,31 @@ python -m pip install -r requirements.txt
 python tools/setup_secrets.py
 ```
 
-Das letzte Kommando erzeugt eine **lokale, von Git ausgeschlossene `secrets.yaml`** mit zufälligem API-/OTA-Schlüssel und getrennten Passwörtern für Weboberfläche und Einrichtungs-WLAN. Eine vorhandene Datei wird niemals überschrieben. Der Schlüssel ist ein Base64-kodierter 32-Byte-Schlüssel; keine selbst ausgedachte Zeichenfolge einsetzen.
+Das Hilfsprogramm erzeugt eine lokale, von Git ausgeschlossene `secrets.yaml` und überschreibt keine vorhandene Datei. Es erzeugt einen gültigen API-Schlüssel sowie getrennte Passwörter für Webzugang und Einrichtungs-WLAN. Die Web-Zugangsdaten sind vorbereitet, werden in der aktuellen Konfiguration aber nicht verwendet.
 
-### 2. Zugangsdaten eintragen
+### 2. Lokale Zugangsdaten
 
-In `secrets.yaml` mindestens diese Angaben anpassen:
+In `secrets.yaml` das eigene WLAN und bei Bedarf MQTT eintragen:
 
-| Schlüssel | Verwendung |
+| Schlüssel | Verwendung im aktuellen Stand |
 | --- | --- |
-| `my_wifi_ssid`, `my_wifi_password` | Dein WLAN |
-| `web_server_username`, `web_server_password` | Anmeldung an der Weboberfläche |
-| `api_encryption_key` | Gemeinsamer Schlüssel für native API und verschlüsselte OTA-Updates |
+| `my_wifi_ssid`, `my_wifi_password` | WLAN-Verbindung |
+| `api_encryption_key` | Verschlüsselung der nativen ESPHome-API; Base64-kodierter 32-Byte-Schlüssel |
 | `fallback_ap_password` | Passwort des Einrichtungs-WLANs |
-| `mqtt_broker`, `mqtt_port` | MQTT-Server und Port, nur für die MQTT-Variante |
+| `mqtt_broker`, `mqtt_port` | Broker und Port für die MQTT-Variante |
 | `mqtt_username`, `mqtt_password`, `mqtt_topic_prefix` | MQTT-Anmeldung und Themen-Präfix |
+| `web_server_username`, `web_server_password` | Vorbereitete Angaben für eine optional aktivierte Webserver-Anmeldung |
 
-[`secrets.example.yaml`](secrets.example.yaml) dokumentiert die Struktur. Sie enthält Platzhalter und kann nicht unverändert als fertige Konfiguration verwendet werden. Echte WLAN-Passwörter, API-Schlüssel und komplette CAN-Aufzeichnungen gehören nicht in GitHub.
+[`secrets.example.yaml`](secrets.example.yaml) enthält nur Platzhalter. Echte Zugangsdaten und vollständige private CAN-Aufzeichnungen nicht veröffentlichen.
 
-### 3. Variante wählen
+**Aktueller Konfigurationsstand:** Die native API ist verschlüsselt. Der HTTP-Webserver hat in `packages/bridge.yaml` derzeit **keine Anmeldung**. ESPHome-OTA ist aktiv, eine OTA-Verschlüsselung ist derzeit **nicht konfiguriert**. Webserver-OTA ist ausgeschaltet. Diese Einstellungen vor dem Einsatz im eigenen Netzwerk prüfen; der Webserver bietet kein HTTPS.
 
-| Datei | Enthalten |
+### 3. Variante wählen und installieren
+
+| Hauptdatei | Enthalten |
 | --- | --- |
-| **`pyromat.yaml`** | Weboberfläche + native API + MQTT; passend z. B. für ioBroker |
-| **`pyromat-api.yaml`** | Weboberfläche + native API; ohne MQTT-Abhängigkeit |
-
-Auch bei der MQTT-Variante bleibt die API aktiv. Ohne verbundenen API-Client oder MQTT-Broker wird kein automatischer Neustart ausgelöst. Wenn Home Assistant beide Integrationen empfängt, können doppelte Entitäten entstehen; dort eine der beiden Anbindungen nutzen.
-
-### 4. Prüfen und installieren
+| `pyromat.yaml` | Weboberfläche, native API und MQTT |
+| `pyromat-api.yaml` | Weboberfläche und native API, ohne MQTT |
 
 ```sh
 esphome config pyromat.yaml
@@ -80,23 +80,21 @@ esphome compile pyromat.yaml
 esphome run pyromat.yaml --device COM5
 ```
 
-`COM5` durch den tatsächlichen USB-Port ersetzen, unter Linux beispielsweise `/dev/ttyUSB0`. Für die Variante ohne MQTT in allen Befehlen `pyromat-api.yaml` verwenden. Die Erstinstallation erfolgt über USB. Danach sind verschlüsselte OTA-Updates mit derselben lokalen `secrets.yaml` möglich:
+`COM5` durch den tatsächlichen USB-Port ersetzen, unter Linux etwa `/dev/ttyUSB0`. Für die Variante ohne MQTT in allen Befehlen `pyromat-api.yaml` verwenden. Die Erstinstallation erfolgt über USB. Spätere Updates lassen sich über ESPHome an die Geräteadresse übertragen:
 
 ```sh
 esphome run pyromat.yaml --device pyromat.local
 ```
 
-Die passende Variante immer beibehalten, damit eine spätere Installation nicht versehentlich MQTT entfernt oder hinzufügt. Die geprüfte Konfiguration verwendet das ESP-IDF-Framework.
+Die gewählte Variante und die lokale `secrets.yaml` beibehalten. Das Projekt verwendet ESP-IDF. Ohne API-Client oder MQTT-Verbindung wird kein automatischer Verbindungsneustart ausgelöst.
 
-### 5. Oberfläche öffnen
+### 4. Oberfläche öffnen
 
-Im eigenen Netzwerk **[http://pyromat.local](http://pyromat.local)** aufrufen und mit den Web-Zugangsdaten anmelden. Falls der Name nicht aufgelöst wird, die IP-Adresse aus dem Router verwenden. Funktioniert das konfigurierte WLAN nicht, stellt ESPHome das passwortgeschützte Netz **„Pyromat Einrichtung“** mit Einrichtungsportal bereit.
-
-Die Oberfläche zeigt fehlende Werte als `—`. Nach 30 Sekunden ohne CAN-Telegramm werden CAN-Werte als veraltet markiert; ein einzelner Messwert läuft nach 60 Sekunden ohne gültige Aktualisierung ab. Ein abgerissenes Browser-Ereignisabonnement wird ebenfalls angezeigt. Gleichbleibende Temperaturen bleiben aktuell, solange sie weiter empfangen werden.
+Im eigenen Netzwerk [http://pyromat.local](http://pyromat.local) aufrufen. Falls die Namensauflösung nicht funktioniert, die IP-Adresse aus dem Router verwenden. Bei fehlender WLAN-Verbindung steht das passwortgeschützte Einrichtungsnetz **„Pyromat Einrichtung“** mit Portal zur Verfügung.
 
 ## Hardware
 
-Vorgesehen sind ein **ESP32 DevKit (`esp32dev`)** und ein **MCP2515-Modul mit passendem CAN-Transceiver**, standardmäßig mit **8-MHz-Quarz**.
+Die Standardbelegung in [`packages/bridge.yaml`](packages/bridge.yaml) lautet:
 
 | ESP32 | MCP2515 / Anschluss |
 | --- | --- |
@@ -107,11 +105,9 @@ Vorgesehen sind ein **ESP32 DevKit (`esp32dev`)** und ein **MCP2515-Modul mit pa
 | GND | Gemeinsame Masse gemäß Anlagenbeschaltung |
 | CAN-Seite des Transceivers | CAN-H und CAN-L der Regelung |
 
-Der INT-Pin wird von dieser Konfiguration nicht verwendet. Versorgung und Logikpegel hängen vom Modul ab: **ESP32-GPIOs sind nicht 5-V-tolerant.** Insbesondere günstige MCP2515-/TJA1050-Module vor dem Anschluss prüfen und gegebenenfalls Pegelanpassung bzw. ein geeignetes Modul verwenden. Eine 24-V-Anlagenversorgung benötigt einen geeigneten Spannungswandler; nicht direkt am ESP32 anschließen. Am Heizgerät nur an der dokumentierten Schnittstelle arbeiten.
+Ein MCP2515-Modul mit geeignetem CAN-Transceiver und standardmäßig **8-MHz-Quarz** verwenden. Der INT-Pin wird nicht verwendet. ESP32-GPIOs sind nicht 5-V-tolerant; Versorgung und Logikpegel des Moduls müssen passen. Eine 24-V-Anlagenversorgung benötigt einen geeigneten Spannungswandler. Der Bus wird nur an seinen beiden Enden terminiert. GPIO5 ist ein Strapping-Pin; die entsprechende ESPHome-Warnung ist bei dieser Belegung zu erwarten.
 
-Der CAN-Bus wird an seinen beiden Enden terminiert. Ein zusätzlicher Teilnehmer in der Mitte bekommt keinen weiteren Abschlusswiderstand. GPIO5 ist beim ESP32 ein Strapping-Pin; die entsprechende ESPHome-Warnung ist bei der bisherigen Belegung zu erwarten. Wenn die Beschaltung den Start beeinflusst, einen geeigneten anderen CS-Pin wählen und umverdrahten.
-
-Abweichende Pins, Gerätebezeichnung oder einen tatsächlich vorhandenen 16-MHz-Quarz über `substitutions` in der gewählten Hauptdatei einstellen, beispielsweise vor `packages:`:
+Abweichungen in der gewählten Hauptdatei vor `packages:` übersteuern, beispielsweise:
 
 ```yaml
 substitutions:
@@ -121,62 +117,79 @@ substitutions:
   mcp2515_clock: 8MHz
 ```
 
-Weitere Vorgaben stehen am Anfang von [`packages/bridge.yaml`](packages/bridge.yaml). Die Quarzfrequenz muss zur Hardware passen. Standard ist `can_mode: NORMAL`: Die Anwendung sendet keine Steuertelegramme, der CAN-Controller bestätigt empfangene gültige Frames jedoch auf Hardwareebene. `LISTENONLY` ist möglich, wenn andere Teilnehmer die notwendigen CAN-Bestätigungen übernehmen.
+Die Quarzfrequenz muss dem Modul entsprechen. Standard ist `can_mode: NORMAL`: Die Anwendung sendet keine CAN-Steuertelegramme, der Controller bestätigt empfangene Frames jedoch auf Hardwareebene mit ACK. `LISTENONLY` setzt eine Busumgebung voraus, in der andere Teilnehmer die notwendigen Bestätigungen übernehmen.
 
 ## CAN-Detektiv
 
-Unter `http://pyromat.local` den vierten Reiter öffnen. **Aufzeichnen** startet eine neue, auf 2.048 Telegramme begrenzte Ringpuffer-Sitzung im ESP32 (standardmäßig AUS). **Stoppen** friert sie ein. **Referenz setzen** merkt sich den jeweils jüngsten Payload pro CAN-ID und vollständigem 16-Bit-Index; später geänderte Bytes werden markiert. Filter, Markierung und CSV-Export geschehen lokal im Browser. Nur die 150 neuesten gefilterten Telegramme erscheinen gleichzeitig in der Tabelle, bis zu 30.000 bleiben für den Export im Browser-RAM. Ab 80 % Browserbelegung wird frühzeitig auf den CSV-Export hingewiesen, ab 95 % mit dringlicher Warnung. Nach 30.000 Einträgen werden ältere Browsertelegramme entfernt und gezählt. Die ESP32- und Browserbelegung werden mit Fortschrittsbalken angezeigt. Nach Schließen der Seite sind Browserdaten weg.
+### Einen Mitschnitt untersuchen
 
-Der GET-Endpunkt `/can/trace?after=<Sequenz>` liefert authentifizierte, begrenzte JSON-Ausschnitte. Er wird nur bei geöffnetem Tab abgefragt. Überlauf- und Sequenzlücken werden separat angezeigt. **Es findet keine CAN-Übertragung statt:** Das Schreibtest-Labor prüft HEX-Werte und zeigt den Frame ausschließlich als Vorschau. Weder REST noch MQTT oder ioBroker können daraus einen realen Schreibzugriff auslösen. Der bestehende CAN-Controller quittiert im Modus NORMAL weiterhin empfangene Frames auf der Hardwareebene (ACK).
+1. Den Reiter **CAN-Detektiv** öffnen und **Aufzeichnen** wählen. Das beginnt eine neue Sitzung und ersetzt die bisherige Aufzeichnung. Benötigte Daten vorher exportieren.
+2. Einige Telegramme abwarten und **Referenz setzen**. Der Browser merkt sich den zuletzt empfangenen Payload je CAN-ID und vollständigem Index. Später empfangene Abweichungen werden byteweise hervorgehoben.
+3. Mit **Markierung** Abschnitte kennzeichnen, etwa vor und nach einer Bedienung am Originalbedienteil. Die Tabelle zeigt nummerierte farbige Trennlinien. Mehrere Markierungen an derselben Sequenz bleiben einzeln sichtbar. Vier Farben wechseln sich ab; die Nummer identifiziert die Markierung eindeutig.
+4. Bei Bedarf nach **CAN-ID**, **16-Bit-Index** oder **Änderungen zur Referenz** filtern. Hexwerte wie `0x008D` sind mit und ohne `0x` zulässig. Markierungen bleiben auch zwischen herausgefilterten Telegrammen sichtbar. Neueste Einträge stehen oben.
+5. **Stoppen**, den Abschluss des Abrufs abwarten und **CSV exportieren**. Der Export enthält die im Browser gespeicherten, zum Filter passenden Frames sowie alle Sitzungsmarkierungen. Für eine vollständige Analyse beide Hex-Filter leeren und **Nur Änderungen zur Referenz** ausschalten.
 
-Bei einer Kesselbedienung zunächst im Ruhezustand eine Aufzeichnung starten, **Referenz setzen**, eine ungefährliche Änderung am Originalbedienteil vornehmen und die Unterschiede untersuchen. Eventuell entstehen keine CAN-Änderungen, wenn eine Bedienung intern erfolgt. Hardwareseitig verpasste Frames kann die Firmware nicht zuverlässig erkennen. Die bestätigte O₂-Sollwert-Zuordnung ist projektspezifisch; Ventilregister sind offen (Details unter [Protokoll](docs/protokoll.md)).
+**Löschen** leert den Mitschnitt, die Browserreferenz und die Markierungen. Eine bereits laufende Aufnahme läuft weiter. Nach einem ESP32-Neustart ist die Aufnahme ausgeschaltet.
+
+### Zeitangaben, Export und Speicher
+
+- **Zeit seit ESP-Start / `Zeit_ms`:** ESP32-Laufzeit in Millisekunden, keine Uhrzeit und keine Zeit seit Aufnahmestart.
+- **Markierungen:** Die Sequenz bezieht sich auf das zuletzt im Browser geladene Telegramm. Die angezeigte Zeit stammt vom Browser; im CSV steht sie als UTC-Zeit mit `Z`. Sie ist kein exakt synchronisierter CAN-Zeitstempel.
+- **Tabelle:** Höchstens 150 gefilterte Telegramme plus die zugehörigen Markierungslinien. Der CSV-Export ist nicht auf diese 150 Frames beschränkt.
+- **ESP32:** Ringpuffer für 2.048 Frames. Ein voller Puffer überschreibt die ältesten Einträge. Bereits vom Browser abgerufene Frames bleiben dort erhalten.
+- **Browser:** Bis zu 30.000 Frames. Warnungen erscheinen ab 80 % und 95 % Belegung. Danach werden ältere Frames entfernt und gezählt. Neuladen oder Schließen verliert Browserverlauf, Referenz und Markierungen; der ESP-Puffer kann nur die noch enthaltenen Frames erneut liefern.
+
+Die CSV verwendet Semikolon als Trennzeichen und enthält `Zeit_ms;Sequenz;CAN_ID;Format;RTR;Index;Daten_HEX`. Markierungen stehen am Ende als Kommentarzeilen, beispielsweise `# Markierung 1 bei Sequenz 588 (2026-10-21T07:07:39.217Z)`.
+
+Der Browser fragt `GET /can/trace?after=<Sequenz>` nur bei sichtbarem CAN-Reiter und sichtbarer Seite ab, maximal 96 Frames je Antwort. Die Aufnahme im ESP32 läuft bis **Stoppen** weiter. Nicht rechtzeitig abgerufene Frames und Ringpuffer-Überschreibungen werden getrennt angezeigt. Hardwareseitige MCP2515-Verluste sind damit nicht messbar; auch lückenlose Sequenznummern beweisen keinen vollständigen Busmitschnitt.
+
+Eine beobachtete Sollwertänderung im zyklischen Datenstrom identifiziert noch keinen Schreibbefehl. Es gibt keine CAN-Schreibfunktion und keine Rohdaten-Veröffentlichung über MQTT. Weitere Grenzen und Registerbeispiele stehen im [CAN-Protokoll](docs/protokoll.md).
 
 ## Anbindungen
 
-**Home Assistant:** ESPHome-Integration hinzufügen, `pyromat.local` bzw. die IP-Adresse und den Schlüssel aus `api_encryption_key` verwenden. Der API-Port ist standardmäßig `6053`. Sensoren und Neustarttaste werden von ESPHome bereitgestellt.
+**Home Assistant:** Die ESPHome-Integration mit `pyromat.local` bzw. Geräte-IP und `api_encryption_key` verbinden. Standardport ist `6053`. Bei gleichzeitigem MQTT-Empfang können doppelte Entitäten entstehen; eine Anbindung wählen.
 
-**ioBroker / MQTT:** Die Broker-Zugangsdaten in `secrets.yaml` setzen und `pyromat.yaml` installieren. ESPHome veröffentlicht unter `mqtt_topic_prefix`, standardmäßig `pyromat`. MQTT-Discovery ist aktiviert. Die Beispielverbindung auf Port `1883` ist unverschlüsselt und für ein vertrauenswürdiges lokales Netz gedacht.
+**ioBroker / MQTT:** `pyromat.yaml` verwenden und die Brokerdaten in `secrets.yaml` setzen. Discovery ist aktiviert, das Themen-Präfix ist standardmäßig `pyromat`. Port `1883` verwendet eine unverschlüsselte MQTT-Verbindung.
 
-**Lokaler HTTP-Zugriff:** Die ESPHome-Webserver-Endpunkte bleiben verfügbar, beispielsweise:
+**HTTP:** Die ESPHome-Webserver-Endpunkte bleiben verfügbar, im aktuellen Stand ohne Anmeldung, beispielsweise:
 
 ```sh
-curl --digest -u admin http://pyromat.local/sensor/Kesseltemperatur
+curl http://pyromat.local/sensor/Kesseltemperatur
 ```
 
-`curl` fragt das Passwort ab. Der Neustart erfolgt durch `POST /button/ESP%20neu%20starten/press`; die Weboberfläche fragt vorher nach. Web-Anmeldung verwendet HTTP Digest. Der Webserver bietet hier kein HTTPS; Zugang nur im eigenen Netz oder über ein VPN, keine direkte Portfreigabe ins Internet. OTA über den Webserver ist ausgeschaltet; Updates erfolgen über ESPHome.
+Die ESP-Neustarttaste verwendet `POST /button/ESP%20neu%20starten/press`. Der Trace-Endpunkt übernimmt die Webserver-Zugriffsregeln; eine Anmeldung besteht nur, wenn sie in der eigenen Konfiguration aktiviert wurde.
 
-## Umstieg von der bisherigen YAML
+## Aktualisieren
 
-Vorherige Konfiguration und Zugangsdaten sichern. Die neue Fassung besteht aus mehreren Dateien; alle gemeinsam übernehmen. Eine vorhandene `secrets.yaml` bleibt erhalten. Bei Bedarf mit `python tools/setup_secrets.py --output secrets.generated.yaml` neue zufällige Angaben erzeugen und die API-/OTA-, Web- und Einrichtungs-WLAN-Einträge in die vorhandene Datei übernehmen. Die erzeugte Zusatzdatei ist ebenfalls von Git ausgeschlossen.
+Vor einem Update die lokale Konfiguration und `secrets.yaml` sichern. Das gesamte Repository aktualisieren; eine einzelne YAML-Datei genügt nicht. API-Schlüssel und WLAN-Zugangsdaten bleiben lokal. Neue Angaben lassen sich bei Bedarf mit `python tools/setup_secrets.py --output secrets.generated.yaml` erzeugen und gezielt übernehmen.
 
-Die internen IDs der bisherigen Messwerte bleiben erhalten. Sichtbare Namen wurden bereinigt und numerische Präfixe entfernt; dadurch können sich Entitätsnamen bzw. MQTT-Themen ändern. In Home Assistant, ioBroker und bestehenden Grafiken die Zuordnung nach dem Update prüfen. Ventilwerte tragen jetzt ausdrücklich **„Rohwert“** und keine unbestätigte Prozent-Einheit. Diese Fassung ergänzt die bisher drei ausgewerteten CAN-IDs um `0x43B` und verarbeitet damit alle vier IDs der Aufzeichnung.
+Sichtbare Namen beeinflussen automatisch erzeugte Entitäten und MQTT-Themen. Insbesondere heißt der O₂-Sollwert **Restsauerstoff Soll**. Die Rohregister heißen **Register 0x007B W3 Rohwert** und **Register 0x007E W2 Rohwert**; ihre internen ESPHome-IDs tragen aus Kompatibilitätsgründen noch die früheren Ventilnamen. Bestehende Home-Assistant-/ioBroker-Zuordnungen bei einem Umstieg prüfen. Die aktuelle Diagnoseansicht zeigt diese ungeklärten Felder nicht mehr.
 
 ## Vorschau und Entwicklung
 
-Die Oberfläche lässt sich ohne ESP32 ansehen:
+Ohne ESP32 die lokale Vorschau starten:
 
 ```sh
 python -m http.server 8000 --bind 127.0.0.1 --directory web
 ```
 
-Danach `http://127.0.0.1:8000/preview.html` öffnen. Ein Banner kennzeichnet die Beispieldaten. Die Vorschau zeigt auch fehlende Daten und Verbindungsausfall; ihre Neustarttaste sendet keinen Befehl.
+[http://127.0.0.1:8000/preview.html](http://127.0.0.1:8000/preview.html) kennzeichnet Beispieldaten ausdrücklich. Die Ansichten **Ohne Daten** und **Verbindungsausfall**, Hell-/Dunkelmodus, Markierungen und Filter lassen sich dort prüfen. Aufnahmebefehle sind deaktiviert; die Neustarttaste sendet in der Vorschau keinen Gerätebefehl.
+
+Prüfungen mit Node.js 22+, Python und einem C++17-Compiler:
 
 ```sh
-node --test tests/dashboard.test.cjs
+node --test tests/dashboard.test.cjs tests/can-detektiv.test.cjs
 python -m unittest discover -s tests -p "test_*.py"
-g++ -std=c++17 tests/decoder_test.cpp -o decoder-test
-./decoder-test
+g++ -std=c++17 -Wall -Wextra -Werror tests/decoder_test.cpp -o /tmp/pyromat-decoder-test
+/tmp/pyromat-decoder-test
+g++ -std=c++17 -Wall -Wextra -Werror -pthread tests/can_trace_test.cpp -o /tmp/pyromat-can-trace-test
+/tmp/pyromat-can-trace-test
+esphome config pyromat.yaml
+esphome config pyromat-api.yaml
+esphome compile pyromat.yaml
+esphome compile pyromat-api.yaml
 ```
 
-Unter Windows kann ein anderer C++17-Compiler verwendet werden. Die [GitHub-Prüfung](.github/workflows/validate.yml) testet Decoder, Oberflächenlogik und die Einrichtung von Zugangsdaten und baut beide Firmware-Varianten. Tests und ein erfolgreicher Build ersetzen nicht die Inbetriebnahmeprüfung an der konkreten Regelung.
+Die `/tmp`-Ausgabepfade unter Windows anpassen. Für die ESPHome-Prüfung wird eine lokale `secrets.yaml` benötigt. Die [GitHub-Prüfung](.github/workflows/validate.yml) führt die Tests aus, prüft beide Konfigurationen und baut beide Firmwarevarianten. Ein erfolgreicher Build bestätigt keine neue CAN-Zuordnung.
 
-## Hintergrund
-
-Das Projekt baut auf dem Austausch im [Holzheizer-Forum: Köb Pyromat Eco 4 – Visualisierung](https://www.holzheizer-forum.de/forum/thread/55272-k%C3%B6b-pyromat-eco-4-visualisierung/) auf. Ergänzende Hinweise stammen unter anderem aus [Derbs CAN-Auswertung](https://github.com/redarflap/pyromat_to_lora/blob/main/main/twai_network_example_master_main.c). Abweichende Register seiner Regelung werden als Vergleich betrachtet und nicht ungeprüft übernommen.
-
-Ein Community-Projekt, keine offizielle Software von Köb oder Viessmann. Neue belegte Zuordnungen und Rückmeldungen zu anderen Regelungsversionen sind willkommen; siehe [CONTRIBUTING.md](CONTRIBUTING.md).
-
-
-### Änderung der Entity-Namen in Version 2.1
-
-Der interne ESPHome-ID `soll_restsauerstoff` bleibt unverändert, sein sichtbarer Name ist jetzt **Restsauerstoff Soll** (bestätigt). Die alten Diagnosenamen „Ventil Ruecklaufmischer Rohwert“ und „Ventil Puffer Rohwert“ heißen jetzt **Register 0x007B W3 Rohwert** und **Register 0x007E W2 Rohwert**; interne YAML-IDs bleiben gleich. MQTT-Topics, automatisch erstellte Entitäten oder ioBroker-Aliase mit den alten Namen müssen bei Bedarf angepasst werden.
+Belegte Zuordnungen und Fehlerberichte sind willkommen; Hinweise unter [CONTRIBUTING.md](CONTRIBUTING.md). Das Projekt entstand aus dem Austausch im [Holzheizer-Forum](https://www.holzheizer-forum.de/forum/thread/55272-k%C3%B6b-pyromat-eco-4-visualisierung/) und berücksichtigt [Derbs CAN-Auswertung](https://github.com/redarflap/pyromat_to_lora/blob/main/main/twai_network_example_master_main.c) als Vergleich. Es ist ein Community-Projekt und keine offizielle Software von Köb oder Viessmann.

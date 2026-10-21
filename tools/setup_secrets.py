@@ -30,6 +30,7 @@ def main():
     except FileExistsError:
         parser.exit(1,'secrets.yaml already exists; existing credentials were preserved.\n')
     print('Local secrets file created. Edit Wi-Fi and MQTT values before flashing.')
-    print('Shared API/OTA key and separate web and fallback AP passwords were generated.')
+    print('Native API key and separate web and fallback AP passwords were generated.')
+    print('Web credentials apply only when web-server authentication is enabled in the configuration.')
 
 if __name__ == '__main__': main()

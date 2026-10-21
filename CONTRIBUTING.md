@@ -15,10 +15,12 @@ Voraussetzungen: Python 3.12+, ESPHome aus `requirements.txt`, Node.js 22+ sowie
 ```sh
 python -m pip install -r requirements.txt
 python tools/setup_secrets.py
-node --test tests/dashboard.test.cjs
+node --test tests/dashboard.test.cjs tests/can-detektiv.test.cjs
 python -m unittest discover -s tests -p "test_*.py"
 g++ -std=c++17 tests/decoder_test.cpp -o decoder-test
 ./decoder-test
+g++ -std=c++17 -pthread tests/can_trace_test.cpp -o can-trace-test
+./can-trace-test
 esphome config pyromat.yaml
 esphome config pyromat-api.yaml
 esphome compile pyromat.yaml

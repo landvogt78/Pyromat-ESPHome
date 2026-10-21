@@ -51,7 +51,7 @@ Die untersuchte private Aufzeichnung enthält 181.073 Telegramme über etwa 76 M
 3F 00 E8 07 0A 00 1E 00 → 30.10.2024
 42 00 03 00 04 00 34 00 → Wochentag 3, Minute 4, Sekunde 52
 45 00 0D 00 00 00 00 00 → Stunde 13
-7B 00 00 00 87 00 10 F5 → Rücklaufmischer Rohwert 62736
+7B 00 00 00 87 00 10 F5 → nicht zugeordnetes Register 0x007B/W3, Rohwert 62736
 ```
 
 Die Kesseluhr läuft in der Aufzeichnung ungefähr 44 Minuten 38 Sekunden hinter der Aufzeichnungszeit. Ihre Fortschreibung passt einschließlich Stundenwechsel zum Log. Angezeigt wird daher die **empfangene Kesselzeit**, keine vom ESP32 erzeugte oder korrigierte Uhr. Die Firmware setzt die Kesseluhr nicht.
@@ -72,12 +72,14 @@ Der Decoder akzeptiert nur acht Bytes auf den vier genannten IDs. Er prüft den 
 
 Nach 30 Sekunden ohne passende CAN-ID meldet die Firmware fehlenden CAN-Empfang. Ein einzelner numerischer Messwert wird nach 60 Sekunden ohne erneute gültige Veröffentlichung ungültig, auch wenn andere Register weiter eintreffen. Jeder Bestandteil von Kesseldatum und -zeit besitzt seine eigene 60-Sekunden-Frist. Ein weiterhin gültiger Sekundenwert kann keine ausgefallene Stunde oder Minute aktuell halten. Text- und binäre Netzwerkangaben werden dagegen bei Änderungen veröffentlicht und benötigen keinen künstlichen Änderungsrhythmus.
 
-Die Firmware interpretiert keine Statusnummer als Heizphase und sendet keine Anwendungs-Steuertelegramme. Der CAN-Detektiv protokolliert auf Anforderung weitere CAN-IDs, besitzt aber nur eine **lokale Schreibtest-Vorschau ohne tatsächliche Übertragung**. Im Standardmodus `NORMAL` bestätigt der CAN-Controller empfangene Frames auf dem Bus. Nur mit geeigneter Busumgebung auf `LISTENONLY` umstellen.
+Die Firmware interpretiert keine Statusnummer als Heizphase und sendet keine Anwendungs-Steuertelegramme. Die Diagnoseansicht zeigt nur CAN-Empfangs-, ESP32- und Netzwerkdaten. Ungeklärte Register und der Betriebsstatus-Rohwert bleiben als API-/MQTT-Sensoren verfügbar, erscheinen aber nicht in dieser Ansicht. Der CAN-Detektiv protokolliert auf Anforderung weitere CAN-IDs und bietet keine Schreibfunktion. Im Standardmodus `NORMAL` bestätigt der CAN-Controller empfangene Frames auf dem Bus. Nur mit geeigneter Busumgebung auf `LISTENONLY` umstellen.
 
-## CAN-Detektiv / Testlabor (ab 2.1)
+## CAN-Detektiv (ab 2.1)
 
-Der vierte Reiter der lokalen Weboberfläche ist ein eingeschalteter Mitschnitt nur auf Knopfdruck. Standard- und Extended-CAN-Nachrichten werden in einem festen, 2.048 Elemente großen RAM-Ringpuffer erfasst. Der geschützte Endpunkt `GET /can/trace?after=<Sequenz>` liefert maximal 96 vollständige Frames je Abruf; er erbt die Webserver-Digest-Authentifizierung. Der Broker bekommt die Rohdaten nicht über MQTT. Im Browser können bis zu 30.000 Telegramme gehalten werden; Anzeigen für ESP-/Browserbelegung warnen ab 80 bzw. 95 Prozent vor dem Verwerfen und melden tatsächlich verworfene Telegramme. Bei Browserlatenz meldet die Oberfläche verpasste Sequenzen und Überläufe auf Anwendungsebene. Paketverluste innerhalb des MCP2515 sind nicht nachweisbar.
+Der vierte Reiter der lokalen Weboberfläche startet den Mitschnitt auf Knopfdruck. Standard- und Extended-CAN-Nachrichten werden in einem festen, 2.048 Elemente großen RAM-Ringpuffer erfasst. Der Endpunkt `GET /can/trace?after=<Sequenz>` liefert maximal 96 vollständige Frames je Abruf und übernimmt die Webserver-Zugriffsregeln. Im aktuellen Konfigurationsstand ist keine Webserver-Anmeldung aktiviert. Der Broker bekommt die Rohdaten nicht über MQTT. Im Browser können bis zu 30.000 Telegramme gehalten werden. Die Tabelle zeigt höchstens 150 gefilterte Frames plus Markierungen. Browserwarnungen erscheinen ab 80 bzw. 95 Prozent Belegung; tatsächlich verworfene Frames werden gezählt. ESP-Ringpuffer-Überschreibungen bedeuten nicht automatisch Datenverlust im Browser. Paketverluste innerhalb des MCP2515 sind nicht nachweisbar, auch nicht durch lückenlose Recorder-Sequenznummern.
 
-Ein Schreibtest-Labor prüft höchstens acht HEX-Datenbytes und eine Standard-ID `0x000`–`0x7FF`, zeigt jedoch nur den geplanten Frame **im Browser**. Es existieren keine Schreib-HTTP-Endpunkte, CAN-Sendeaktionen, automatischen Anfragen oder sonstigen Übertragungsmöglichkeiten. Speziell bei Verbrennungs- und Sicherheitseinstellungen niemals anhand vermuteter Register experimentieren.
+Markierungen erscheinen als farbige, nummerierte Trennlinien nach der zuletzt im Browser geladenen Sequenz. Die Nummern bleiben auch bei mehreren Markierungen an derselben Sequenz eindeutig. Die Markierungszeit stammt vom Browser, wird lokal angezeigt und im CSV als UTC-Kommentar gespeichert. `Zeit_ms` bezeichnet dagegen die ESP32-Laufzeit. Beide Zeiten sind nicht exakt synchronisiert. Filter beeinflussen die exportierten Frames; die Markierungskommentare bleiben erhalten. Eine Kurzanleitung steht direkt in der Ansicht und ausführlicher in der [README](../README.md#can-detektiv).
+
+Es existieren keine CAN-Schreib-HTTP-Endpunkte oder CAN-Sendeaktionen. Der Logger und die Aufnahmebuttons verändern nur den lokalen Aufzeichnungszustand. Eine zyklische Sollwertübertragung beweist kein Schreibprotokoll.
 
 Hinweis zur bestätigten Kesseluhr: Die *Uhrzeit* wurde vom Anlagenbetreiber bestätigt; das *Datum* bleibt in der Aufzeichnung plausibel, ohne gesondert nachgewiesene Displayübereinstimmung.

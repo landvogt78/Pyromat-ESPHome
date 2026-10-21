@@ -59,16 +59,6 @@
       parseInt(data.slice(2,4)+data.slice(0,2),16) : null;
     return {seq:raw.seq,ms:raw.ms,id:raw.id,ext:raw.ext,rtr:raw.rtr,data,index};
   }
-  function parseDryRunFrame(inputId,inputData) {
-    const idValue=String(inputId||'').trim();
-    if(!/^(?:0x)?[0-9a-f]{1,3}$/i.test(idValue))return {error:'CAN-ID als Hexzahl eingeben, z. B. 0x23B.'};
-    const id=parseInt(idValue.replace(/^0x/i,''),16);
-    if(id>0x7FF)return {error:'CAN-ID muss zwischen 0x000 und 0x7FF liegen.'};
-    const data=String(inputData||'').replace(/[\s,\-:]/g,'').toUpperCase();
-    if(!data || data.length%2!==0 || !/^[0-9A-F]+$/.test(data))return {error:'Daten als vollständige HEX-Bytes eingeben.'};
-    if(data.length>16)return {error:'Maximal 8 Datenbytes je Standard-CAN-Telegramm.'};
-    return {id,hexId:formatCanHex(id),data};
-  }
   function changedBytes(before,after) {
     if (before===null || before===undefined)return [];
     const previous=String(before),current=String(after), result=[];
@@ -77,13 +67,31 @@
     }
     return result;
   }
-  function traceCsv(rows) {
+  function traceEntries(frames, markers, limit=150) {
+    const latest=frames.slice(-limit);
+    const firstSequence=frames.length>limit?latest[0].seq:0;
+    const entries=latest.map(frame=>({type:'frame',frame}));
+    for(const marker of markers) {
+      if(marker.sequence>=firstSequence)entries.push({type:'marker',marker});
+    }
+    return entries.sort((a,b)=>{
+      const sequence=item=>item.type==='marker'?item.marker.sequence:item.frame.seq;
+      const order=sequence(b)-sequence(a);
+      if(order)return order;
+      if(a.type!==b.type)return a.type==='marker'?-1:1;
+      return a.type==='marker'?b.marker.number-a.marker.number:0;
+    });
+  }
+  function traceCsv(rows, markers=[]) {
     const lines=['Zeit_ms;Sequenz;CAN_ID;Format;RTR;Index;Daten_HEX'];
     rows.forEach(row=>{
       if(!row || typeof row.seq!=='number' || typeof row.data!=='string')return;
       lines.push([row.ms,row.seq,formatCanHex(row.id,row.ext),row.ext?'Extended':'Standard',row.rtr?'Ja':'Nein',
         row.index===null?'':formatCanHex(row.index,false,true),row.data].join(';'));
     });
+    for(const marker of markers) {
+      lines.push('# Markierung '+marker.number+' bei Sequenz '+marker.sequence+' ('+marker.at+')');
+    }
     return lines.join('\r\n')+'\r\n';
   }
   function traceStorageState({espBuffered=0,espCapacity=2048,browserUsed=0,browserCapacity=30000,browserPruned=0}={}) {
@@ -96,7 +104,7 @@
     return {espPercent,browserPercent,level,message};
   }
   const api = {entityKey, numeric, reading, format, eventReading, bindPageLifecycle, restartRequest,
-    formatCanHex,parseTraceFrame,parseDryRunFrame,changedBytes,traceCsv,traceStorageState};
+    formatCanHex,parseTraceFrame,changedBytes,traceEntries,traceCsv,traceStorageState};
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof window !== 'undefined') window.PyromatDashboard = api;
 })();
@@ -114,9 +122,7 @@
     puffer_mitte:['Puffer Mitte','°C',1], puffer_unten:['Puffer unten','°C',1], heizungsvorlauf:['Heizungsvorlauf','°C',1],
     restsauerstoff:['Restsauerstoff','%',1], restsauerstoff_soll:['Restsauerstoff Soll','%',1],
     luefterdrehzahl:['Lüfterdrehzahl','rpm',0], primaerluftklappe:['Primärluftklappe','%',0], sekundaerluftklappe:['Sekundärluftklappe','%',0],
-    register_0x007b_w3_rohwert:['Register 0x007B/W3 · ungeklärt','',0,'raw'], register_0x007e_w2_rohwert:['Register 0x007E/W2 · ungeklärt','',0,'raw'],
-    register_0117_wert_1:['Register 0x0117 · Wert 1','',0,'raw'], register_0117_wert_2:['Register 0x0117 · Wert 2','',0,'raw'],
-    betriebsstatus_rohwert:['Betriebsstatus · Rohwert','',0,'raw'], kesseluhr:['Kesseluhr','','text'],
+    kesseluhr:['Kesseluhr','','text'],
     kesseldatum:['Kesseldatum','','text'], kesselwochentag:['Wochentag','','text'],
     can_datenalter:['Letztes CAN-Telegramm','s',0,'system'], can_telegramme:['Empfangene Telegramme','',0,'system'],
     wlan_signal:['WLAN-Signal','dBm',0,'system'], betriebszeit:['Betriebszeit','s',0,'system'],
@@ -174,9 +180,19 @@
     <div class="bottom-grid"><section class="panel"><div class="panel-head"><h2>Verbrennung &amp; Luft</h2></div><div class="rows">${['primaerluftklappe','sekundaerluftklappe'].map(key=>'<div class="row bar-row"><span class="row-name">'+fields[key][0]+'</span><div class="bar"><i data-bar="'+key+'"></i></div><span class="row-value">'+value(key)+'<small>%</small></span></div>').join('')}${row('kesseltemperatur_soll')}${row('restsauerstoff_soll')}</div></section>
     <section class="panel"><div class="panel-head"><h2>Kesseluhr</h2><span class="badge">VOM KESSEL</span></div><div class="clock">${value('kesseluhr')}</div><div class="clock-sub">${value('kesselwochentag')} · ${value('kesseldatum')}</div><div class="clock-note">Zuletzt empfangene Kesselzeit · aktualisiert sich mit den Telegrammen</div></section></div></div>
     <div class="view" role="tabpanel" aria-labelledby="tab-values" id="view-values" hidden><div class="section-title"><h2>Alle Messwerte</h2><p>Empfangene Werte deiner Anlage. Ein Strich bedeutet: noch kein gültiger Messwert.</p></div><div class="value-groups">${panel('Kessel & Heizkreis',['kesseltemperatur','kesseltemperatur_soll','kesselruecklauf','systemtemperatur','abgastemperatur','heizungsvorlauf'])}${panel('Pufferspeicher',['puffer_oben','puffer_mitte','puffer_unten'])}${panel('Verbrennung & Luft',['restsauerstoff','restsauerstoff_soll','luefterdrehzahl','primaerluftklappe','sekundaerluftklappe'])}${panel('Datum & Uhrzeit',['kesseluhr','kesseldatum','kesselwochentag'])}</div></div>
-    <div class="view" role="tabpanel" aria-labelledby="tab-diagnostics" id="view-diagnostics" hidden><div class="section-title"><h2>Verbindung & Diagnose</h2><p>Empfang, Netzwerk und noch nicht zugeordnete Datenfelder.</p></div><div class="notice"><strong>Rohwerte bleiben Rohwerte.</strong> Die früher als Rücklaufmischer und Pufferventil interpretierten Rohfelder 0x007B/W3 und 0x007E/W2 sind nicht plausibel zugeordnet. O₂-Sollwert und Kesseluhr wurden am Projektkessel bestätigt.</div><div class="value-groups">${panel('CAN-Bus',['can_empfang','can_datenalter','can_telegramme','betriebsstatus_rohwert'])}${panel('ESP32 & Netzwerk',['wlan_verbindung','wlan_signal','betriebszeit','ip_adresse','wlan_name'])}${panel('Ungeklärte Register · keine bestätigten Ventilwerte',['register_0x007b_w3_rohwert','register_0x007e_w2_rohwert'])}${panel('Weitere Register · Zuordnung offen',['register_0117_wert_1','register_0117_wert_2'])}</div></div>
+    <div class="view" role="tabpanel" aria-labelledby="tab-diagnostics" id="view-diagnostics" hidden><div class="section-title"><h2>Verbindung & Diagnose</h2><p>CAN-Empfang, Datenalter und Netzwerkverbindung deines ESP32.</p></div><div class="value-groups">${panel('CAN-Bus',['can_empfang','can_datenalter','can_telegramme'])}${panel('ESP32 & Netzwerk',['wlan_verbindung','wlan_signal','betriebszeit','ip_adresse','wlan_name'])}</div></div>
     <div class="view" role="tabpanel" aria-labelledby="tab-can" id="view-can" hidden>
       <div class="section-title"><h2>CAN-Detektiv</h2><p>Telegramme lokal untersuchen und für die Protokollanalyse exportieren. Der ESP32 sendet keine CAN-Steuerbefehle.</p></div>
+      <details class="notice trace-help" open>
+        <summary>Kurzanleitung</summary>
+        <ol>
+          <li><strong>Aufzeichnen</strong> startet einen neuen Mitschnitt und ersetzt die bisherige Sitzung. Vorher benötigte Daten als CSV sichern.</li>
+          <li>Einige Telegramme abwarten und <strong>Referenz setzen</strong>. Danach empfangene Abweichungen werden in den Datenbytes hervorgehoben.</li>
+          <li>Mit <strong>Markierung</strong> vor und nach einer Bedienung am Originalbedienteil Abschnitte kennzeichnen. Jede Markierung erscheint als farbige Trennlinie mit Nummer, Browserzeit und zuletzt geladener Sequenz. Neueste Einträge stehen oben.</li>
+          <li><strong>Stoppen</strong>, den Abruf abwarten und <strong>CSV exportieren</strong>. Der Export enthält alle im Browser gespeicherten Telegramme, die zu den Filtern passen, sowie die Markierungen. Für den vollständigen Mitschnitt beide Hex-Filter leeren und „Nur Änderungen“ ausschalten.</li>
+        </ol>
+        <p>Die Tabelle zeigt höchstens 150 Telegramme. „Zeit seit ESP-Start“ ist die Laufzeit des ESP32; Markierungszeiten stammen vom Browser. Beim Neuladen gehen Browserverlauf, Referenz und Markierungen verloren. <strong>Löschen</strong> leert den Mitschnitt; eine laufende Aufnahme läuft weiter.</p>
+      </details>
       <section class="panel trace-panel">
         <div class="panel-head"><div><h2>Live-Mitschnitt</h2><p>125 kbit/s · Standard- und Extended-Frames · 2.048 Einträge im ESP32-Ringpuffer</p></div><span class="badge" id="trace-running">Aus</span></div>
         <div class="trace-controls">
@@ -195,18 +211,8 @@
           <label>16-Bit-Index (Hex)<input id="trace-filter-index" placeholder="z. B. 0x008D" autocomplete="off"></label>
           <label><input type="checkbox" id="trace-filter-delta"> Nur Änderungen zur Referenz</label>
         </div>
-        <div class="trace-scroll"><table class="trace-table"><thead><tr><th>Uptime</th><th>Seq</th><th>CAN-ID</th><th>Index</th><th>Rohdaten (HEX)</th><th>Format</th></tr></thead><tbody id="trace-rows"><tr><td colspan="6">Noch keine Aufzeichnung</td></tr></tbody></table></div>
+        <div class="trace-scroll"><table class="trace-table"><thead><tr><th>Zeit seit ESP-Start (ms)</th><th>Seq</th><th>CAN-ID</th><th>Index</th><th>Rohdaten (HEX)</th><th>Format</th></tr></thead><tbody id="trace-rows"><tr><td colspan="6">Noch keine Aufzeichnung</td></tr></tbody></table></div>
         <p id="trace-notices" class="trace-notices">Keine verlorenen Pakete erfasst. Der MCP2515 kann bei hoher Buslast dennoch Telegramme vor der Aufzeichnung verlieren.</p>
-      </section>
-      <section class="panel trace-panel">
-        <div class="panel-head"><div><h2>Schreibtest-Labor (Simulation)</h2><p>CAN-Frame zusammenstellen und validieren. Keine Übertragung an die Ecotronic.</p></div><span class="badge">Gesperrt · Nur Vorschau</span></div>
-        <div class="trace-filters">
-          <label>Standard-CAN-ID (HEX)<input id="trace-tx-id" value="0x23B" autocomplete="off"></label>
-          <label>Datenbytes (maximal 8)<input id="trace-tx-data" value="8D 00 7F 00 46 00 CD 01" autocomplete="off"></label>
-          <button class="button" id="trace-tx-preview" type="button">Frame prüfen</button>
-        </div>
-        <pre id="trace-tx-result" class="trace-tx-result" aria-live="polite">Es werden keine Nachrichten gesendet.</pre>
-        <p class="trace-notices"><strong>ACHTUNG:</strong> Weder Hex-Eingabe noch Kopieren verändern den Kessel. Ein späterer realer Schreibzugriff benötigt nachgewiesenes Protokoll, zugelassene Testparameter und eigene physische Freigabe.</p>
       </section>
     </div>
     <footer class="footer"><span>Pyromat ESPHome · Lokaler Anlagenmonitor</span><a href="https://github.com/landvogt78/Pyromat-ESPHome" target="_blank" rel="noopener noreferrer">Dokumentation &amp; Projekt ↗</a></footer></main>
@@ -306,8 +312,7 @@
   const sample={kesseltemperatur:77.4,kesseltemperatur_soll:86,abgastemperatur:168.2,kesselruecklauf:63.1,
     systemtemperatur:76.8,puffer_oben:76.2,puffer_mitte:57.8,puffer_unten:34.6,heizungsvorlauf:38.5,
     restsauerstoff:6.8,restsauerstoff_soll:7,luefterdrehzahl:1380,primaerluftklappe:42,sekundaerluftklappe:31,
-    register_0x007b_w3_rohwert:62736,register_0x007e_w2_rohwert:2800,register_0117_wert_1:140,register_0117_wert_2:980,
-    betriebsstatus_rohwert:6,kesseluhr:'14:32:08',kesseldatum:'30.10.2024',kesselwochentag:'Mittwoch',can_datenalter:2,
+    kesseluhr:'14:32:08',kesseldatum:'30.10.2024',kesselwochentag:'Mittwoch',can_datenalter:2,
     can_telegramme:181073,wlan_signal:-58,betriebszeit:86400,ip_adresse:'192.168.1.42',wlan_name:'Heimnetz',can_empfang:true,wlan_verbindung:true};
   function loadPreview(state) {
     demoState=state;
@@ -347,7 +352,7 @@
 })();
 
 
-/* CAN trace UI: read-only HTTP polling, local CSV and dry-run-only frame validation. */
+/* CAN trace UI: read-only HTTP polling, local markers and CSV export. */
 (function () {
   'use strict';
   if (typeof document === 'undefined') return;
@@ -391,8 +396,15 @@
     warning.textContent=storage.message;
     warning.className='trace-memory-warning '+storage.level;
     const data=visibleFrames();
-    const latest=data.slice(-150).reverse();
-    el('trace-rows').innerHTML=latest.map(frame=>{
+    const retainedMarkers=markers.filter(marker=>!localPruned || marker.sequence>=history[0].seq-1);
+    const latest=api.traceEntries(data,retainedMarkers);
+    el('trace-rows').innerHTML=latest.map(entry=>{
+      if(entry.type==='marker') {
+        const mark=entry.marker;
+        const time=new Date(mark.at).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit',second:'2-digit',fractionalSecondDigits:3});
+        return '<tr class="trace-marker" data-tone="'+((mark.number-1)%4)+'"><td colspan="6"><div class="trace-marker-label"><strong>Markierung '+mark.number+'</strong><span>nach #'+mark.sequence+'</span><time datetime="'+mark.at+'">Browserzeit '+time+'</time></div></td></tr>';
+      }
+      const frame=entry.frame;
       const octets=frame.data.match(/.{2}/g)||[];
       const raw=octets.map((byte,i)=>frame.diff.includes(i)?'<mark class="trace-delta">'+byte+'</mark>':byte).join(' ');
       return '<tr><td>'+frame.ms+'</td><td>'+frame.seq+'</td><td>'+api.formatCanHex(frame.id,frame.ext)+'</td><td>'+
@@ -421,7 +433,7 @@
         !Array.isArray(packet.frames) || !Number.isSafeInteger(packet.overwritten) ||
         !Number.isSafeInteger(packet.missed))throw new Error('Ungültige CAN-Antwort');
     if (generation!==packet.generation) {
-      resetClient();
+      if(generation!==null)resetClient();
       generation=packet.generation;
     }
     recording=packet.running;
@@ -490,13 +502,12 @@
     el('trace-state').textContent='Referenz gesetzt: '+references.size+' eindeutige CAN-ID/Index-Kombinationen.';
   });
   el('trace-marker').addEventListener('click',()=>{
-    markers.push({sequence:cursor,at:new Date().toISOString()});
+    markers.push({number:markers.length+1,sequence:cursor,at:new Date().toISOString()});
     renderTrace();
   });
   el('trace-export').addEventListener('click',()=>{
     const rows=visibleFrames();
-    const notes=markers.map(mark=>'# Markierung bei Sequenz '+mark.sequence+' ('+mark.at+')').join('\r\n');
-    const csv='\uFEFF'+api.traceCsv(rows)+(notes?notes+'\r\n':'');
+    const csv='\uFEFF'+api.traceCsv(rows,markers);
     const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
     const link=document.createElement('a');
     link.href=url;
@@ -508,12 +519,6 @@
   });
   for(const id of ['trace-filter-id','trace-filter-index','trace-filter-delta'])
     el(id).addEventListener('input',renderTrace);
-  el('trace-tx-preview').addEventListener('click',()=>{
-    const result=api.parseDryRunFrame(el('trace-tx-id').value,el('trace-tx-data').value);
-    el('trace-tx-result').textContent=result.error?'Ungültige Eingabe: '+result.error:
-      'Nur Simulation · NICHT gesendet\nStandard-CAN '+result.hexId+' · '+result.data.match(/.{2}/g).join(' ')+'\n'+
-      result.data.length/2+' Datenbytes · keine Steuerfreigabe vorhanden';
-  });
   if(preview) {
     const samples=[
       {seq:1,ms:100,id:0x23B,ext:false,rtr:false,data:'8D007F004600CD01'},
