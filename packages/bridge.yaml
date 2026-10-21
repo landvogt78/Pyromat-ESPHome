@@ -43,8 +43,8 @@ api:
 
 ota:
   - platform: esphome
-    encryption:
-      key: !secret api_encryption_key
+   # encryption:
+    #  key: !secret api_encryption_key
 
 wifi:
   ssid: !secret my_wifi_ssid
@@ -68,10 +68,7 @@ web_server:
   js_include: web/dashboard.js
   log: false
   ota: false
-  auth:
-    username: !secret web_server_username
-    password: !secret web_server_password
-    type: digest
+
 
 spi:
   clk_pin: ${spi_clk_pin}
