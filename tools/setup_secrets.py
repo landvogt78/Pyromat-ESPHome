@@ -8,7 +8,10 @@ import secrets
 
 def create(destination, template):
     text = Path(template).read_text(encoding='utf-8')
-    values = {'api_encryption_key': base64.b64encode(secrets.token_bytes(32)).decode('ascii')}
+    values = {
+        'api_encryption_key': base64.b64encode(secrets.token_bytes(32)).decode('ascii'),
+        'pyromat_a6_udp_key': secrets.token_hex(32),
+    }
     for key in ['web_server_password','fallback_ap_password']:
         values[key] = secrets.token_urlsafe(24)
     for key,value in values.items():
@@ -30,7 +33,8 @@ def main():
     except FileExistsError:
         parser.exit(1,'secrets.yaml already exists; existing credentials were preserved.\n')
     print('Local secrets file created. Edit Wi-Fi and MQTT values before flashing.')
-    print('Native API key and separate web and fallback AP passwords were generated.')
+    print('Native API key, separate web/fallback AP passwords and a FoxAIR UDP key were generated.')
+    print('Optional FoxAIR link: copy the UDP key locally to the A6 secrets.yaml; never share it.')
     print('Web credentials apply only when web-server authentication is enabled in the configuration.')
 
 if __name__ == '__main__': main()

@@ -1,0 +1,5 @@
+# Web + API + MQTT, plus direct encrypted wood-buffer temperatures for FoxAIR A6.
+# Use the SAME pyromat_a6_udp_key in the local secrets.yaml of both devices.
+packages:
+  standard: !include pyromat.yaml
+  foxair: !include packages/foxair_udp.yaml
