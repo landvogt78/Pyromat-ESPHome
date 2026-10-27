@@ -193,3 +193,76 @@ esphome compile pyromat-api.yaml
 Die `/tmp`-Ausgabepfade unter Windows anpassen. Für die ESPHome-Prüfung wird eine lokale `secrets.yaml` benötigt. Die [GitHub-Prüfung](.github/workflows/validate.yml) führt die Tests aus, prüft beide Konfigurationen und baut beide Firmwarevarianten. Ein erfolgreicher Build bestätigt keine neue CAN-Zuordnung.
 
 Belegte Zuordnungen und Fehlerberichte sind willkommen; Hinweise unter [CONTRIBUTING.md](CONTRIBUTING.md). Das Projekt entstand aus dem Austausch im [Holzheizer-Forum](https://www.holzheizer-forum.de/forum/thread/55272-k%C3%B6b-pyromat-eco-4-visualisierung/) und berücksichtigt [Derbs CAN-Auswertung](https://github.com/redarflap/pyromat_to_lora/blob/main/main/twai_network_example_master_main.c) als Vergleich. Es ist ein Community-Projekt und keine offizielle Software von Köb oder Viessmann.
+
+## Holzpuffertemperaturen direkt an FoxAIR A6
+
+Die optionale Konfiguration **`pyromat-foxair.yaml`** enthält die bisherige
+Weboberfläche, API und MQTT und ergänzt den direkten UDP-Versand an den A6.
+`pyromat.yaml` und `pyromat-api.yaml` behalten ihren bisherigen Umfang.
+Für API ohne MQTT kann stattdessen das Paket `packages/foxair_udp.yaml` zur
+bestehenden Paketliste von `pyromat-api.yaml` ergänzt werden.
+
+### Vorbereiten und flashen
+
+1. Diesen Branch vollständig herunterladen; als Einstieg **`pyromat-foxair.yaml`**
+   verwenden. Die vorhandene lokale `secrets.yaml` erhalten.
+2. Den bereits auf dem A6 verwendeten Wert von `pyromat_a6_udp_key` unverändert
+   in die lokale Pyromat-`secrets.yaml` übernehmen. Auf beiden Geräten muss
+   exakt derselbe Schlüssel stehen. Schlüssel nicht ins Repository oder in
+   Supportnachrichten kopieren. Ein neuer Zufallsschlüssel muss auf beiden
+   Geräten eingetragen werden; mindestens 32 zufällige Bytes, z. B. als Hexstring.
+   Bei neuen Setups erzeugt `python tools/setup_secrets.py` einen solchen
+   separaten Schlüssel. Das Werkzeug überschreibt bestehende Secrets niemals.
+3. Der ESPHome-Knotenname (`device_name`) muss zum A6-Provider `pyromat` passen.
+   Das ist der technische Knotenname, nicht der Anzeigename „Pyromat Eco“.
+4. Beide Geräte benötigen gegenseitigen UDP-Verkehr auf Port **18511** im
+   gleichen Broadcast-Netz. WLAN-Client-Isolation bzw. getrennte VLANs können
+   den Austausch verhindern. Eine MQTT-Verbindung allein genügt nicht.
+5. Lokal prüfen, kompilieren und auf den **Pyromat-ESP** laden:
+
+   ```sh
+   esphome config pyromat-foxair.yaml
+   esphome run pyromat-foxair.yaml
+   ```
+
+   Den A6 weiterhin mit dem aktuellen FoxAIR-PR1 betreiben. Sein vorhandener
+   Empfänger ist kompatibel; allein diese Senderergänzung verlangt keinen
+   weiteren A6-Codewechsel. Die alternative ältere Vorlage
+   `integrations/pyromat-transport.yaml` aus dem FoxAIR-Repository nicht zusätzlich
+   einbinden, sonst würden zwei Transportpakete konkurrieren.
+
+### Werte und Ausfälle
+
+| Pyromat-Quelle | UDP-ID | A6-Anzeige |
+| --- | --- | --- |
+| `puffer_oben` | `top_live` | Holzpuffer Oben |
+| `puffer_mitte` | `mid_live` | Holzpuffer Mitte |
+| `puffer_unten` | `bottom_live` | Holzpuffer Unten |
+
+Der Sender verwendet drei interne Copy-Sensoren mit jeweils eigenem
+**15-s-Timeout**. Nur erneut empfangene CAN-Messwerte erneuern ihn, auch wenn
+sich die Temperatur nicht ändert. Ein anderer weiterhin aktualisierter Fühler,
+UDP-Wiederholungen oder MQTT-Verkehr erneuern ihn nicht. Ein abgelaufener Wert
+wird als `NaN` versendet; er wird weder durch null noch durch den letzten Wert
+ersetzt. Das vorhandene Pyromat-Dashboard behält seinen getrennten 60-s-Timeout.
+
+Packet Transport sendet verschlüsselt mit Rolling Code, spätestens beim
+2-s-Intervall erneut alle drei Werte und zusätzlich bei Änderungen. Der A6
+verlangt bereits Ping-Pong-Antworten gegen alte Pakete. Der verschlüsselte
+Sender empfängt und beantwortet dessen Challenges automatisch; er benötigt
+keinen eigenen Provider und ist nicht vom technischen Knotennamen des A6
+abhängig. Der Transport enthält ausschließlich Temperaturen, keine Pumpen-
+oder Brennerbefehle.
+
+Nach dem Flash zunächst die drei Holzpufferanzeigen am A6 mit den Pyromatwerten
+vergleichen. Bei fehlenden Werten Schlüssel, Sendername und UDP-Netzweg prüfen.
+Bei ausbleibenden passenden CAN-Messwerten muss die A6-Anzeige nach dem
+15-s-Quelltimeout zuzüglich Übertragung ungültig werden, obwohl der ESP weiterläuft;
+bei unterbrochenem UDP greift zusätzlich die vorhandene A6-Verbindungsüberwachung.
+Reale Wärmequellenwahl erst anschließend begleiten.
+
+**Prüfgrenze dieser Änderung:** Python-Konfigurations-/Schlüsseltests und
+bestehende Node-Tests ohne Compiler. ESPHome 2026.10.0 CopySensor-, TimeoutFilter-
+und UDP/Packet-Transport-Quellen wurden gelesen. Keine ESPHome-Konfigurations-
+prüfung, C++-Erzeugung, Kompilierung, Geräteprüfung oder Flash durch den Agenten;
+die genannten Kommandos sind die nächsten lokalen Schritte des Betreibers.

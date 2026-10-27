@@ -1,0 +1,46 @@
+# Optional Pyromat -> FoxAIR A6 temperature sender. No actuator commands.
+# Keep device_name: pyromat (or adapt the A6's provider name to match).
+udp:
+  id: pyromat_a6_udp
+  port: 18511
+
+packet_transport:
+  - platform: udp
+    id: pyromat_a6_transport
+    udp_id: pyromat_a6_udp
+    encryption: !secret pyromat_a6_udp_key
+    rolling_code_enable: true
+    update_interval: 2s
+    # The A6 enforces ping-pong freshness. Encrypted providers automatically
+    # answer its challenges; this send-only node needs no remote sensor/provider.
+    sensors:
+      - id: foxair_wood_top_live
+        broadcast_id: top_live
+      - id: foxair_wood_mid_live
+        broadcast_id: mid_live
+      - id: foxair_wood_bottom_live
+        broadcast_id: bottom_live
+
+sensor:
+  # Only actual source publications renew these independent timeouts. No polling
+  # of cached values: a live UDP sender cannot make a dead CAN source fresh.
+  # Timeout publishes NaN (not last/zero); NaN is sent and invalidates A6 input.
+  # Existing source sensors publish even unchanged CAN values, without delta.
+  - platform: copy
+    id: foxair_wood_top_live
+    source_id: puffer_oben
+    internal: true
+    filters:
+      - timeout: 15s
+  - platform: copy
+    id: foxair_wood_mid_live
+    source_id: puffer_mitte
+    internal: true
+    filters:
+      - timeout: 15s
+  - platform: copy
+    id: foxair_wood_bottom_live
+    source_id: puffer_unten
+    internal: true
+    filters:
+      - timeout: 15s

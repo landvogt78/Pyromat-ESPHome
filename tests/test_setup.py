@@ -22,6 +22,22 @@ class SetupTests(unittest.TestCase):
             self.assertNotIn('GENERATE_ME',text)
             self.assertNotEqual(pairs['fallback_ap_password'],pairs['web_server_password'])
 
+    def test_udp_keys_are_random_separate_and_existing_files_stay_private(self):
+        with tempfile.TemporaryDirectory() as directory:
+            keys = []
+            for number in range(2):
+                output = pathlib.Path(directory)/f'secrets-{number}.yaml'
+                setup.create(output, ROOT/'secrets.example.yaml')
+                pairs = dict(line.split(': ',1) for line in output.read_text().splitlines()
+                             if line and not line.startswith('#'))
+                self.assertIn('pyromat_a6_udp_key', pairs, 'setup must generate the shared UDP key')
+                key = pairs['pyromat_a6_udp_key'].strip('"')
+                self.assertEqual(len(bytes.fromhex(key)), 32)
+                self.assertNotEqual(key, pairs['api_encryption_key'].strip('"'))
+                self.assertEqual(output.stat().st_mode & 0o777, 0o600)
+                keys.append(key)
+            self.assertNotEqual(*keys)
+
     def test_existing_credentials_are_never_overwritten(self):
         with tempfile.TemporaryDirectory() as directory:
             output=pathlib.Path(directory)/'secrets.yaml'

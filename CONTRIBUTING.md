@@ -30,3 +30,8 @@ esphome compile pyromat-api.yaml
 Für Decoderänderungen kleine anonymisierte Acht-Byte-Beispiele mit erwarteten Ergebnissen ergänzen. Bei Oberflächenänderungen die Vorschau am Desktop und auf schmalem Bildschirm prüfen, einschließlich „Ohne Daten“, Verbindungsausfall und Neustartdialog. Die Vorschau darf keinen Gerätebefehl senden. API-/MQTT-Zugangsdaten und reale `secrets.yaml` bleiben lokal.
 
 Firmware-Builds belegen die Übersetzbarkeit. Änderungen an den Zuordnungen müssen zusätzlich mit echten Displaywerten geprüft werden, bevor sie als für ein neues Modell bestätigt dokumentiert werden.
+
+Die optionale A6-Anbindung zusätzlich mit `esphome config pyromat-foxair.yaml`
+und `esphome compile pyromat-foxair.yaml` lokal prüfen. Sie benötigt den separaten
+UDP-Schlüssel in der lokalen Secrets-Datei. Compilerfreie Konfigurationsverträge
+liegen in `tests/test_foxair_udp.py` (PyYAML, mit ESPHome bereits installiert).
